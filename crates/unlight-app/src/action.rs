@@ -5,6 +5,19 @@ use crate::state::Tool;
 use eframe::egui::{Key, KeyboardShortcut, ModifierNames, Modifiers};
 use unlight_catalog::{Flag, Label};
 use unlight_raw::MergeKind;
+use unlight_recipe::Orientation;
+
+/// The turns on offer, in menu order.
+pub const TURNS: [(&str, Orientation); 4] = [
+    ("Rotate Left", Orientation::RotateCcw),
+    ("Rotate Right", Orientation::RotateCw),
+    ("Flip Horizontal", Orientation::MirrorX),
+    ("Flip Vertical", Orientation::MirrorY),
+];
+
+pub fn turn_label(turn: Orientation) -> &'static str {
+    TURNS.iter().find(|(_, each)| *each == turn).map_or("Turn", |(label, _)| label)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -48,6 +61,8 @@ pub enum Action {
     OpenImport,
     OpenExport,
     PhotoMerge(MergeKind),
+    /// Turns or flips the selection, as seen on screen.
+    Turn(Orientation),
     Confirm,
     Cancel,
     ToggleAspectLock,
@@ -74,6 +89,8 @@ pub const BINDINGS: &[(Modifiers, Key, Action)] = &[
     (CTRL_SHIFT, Key::R, Action::ResetAll),
     (CTRL_SHIFT, Key::E, Action::OpenExport),
     (CTRL_SHIFT, Key::I, Action::OpenImport),
+    (CTRL, Key::OpenBracket, Action::Turn(Orientation::RotateCcw)),
+    (CTRL, Key::CloseBracket, Action::Turn(Orientation::RotateCw)),
     (CTRL, Key::H, Action::PhotoMerge(MergeKind::Hdr)),
     (CTRL, Key::M, Action::PhotoMerge(MergeKind::Panorama)),
     (CTRL, Key::Z, Action::Undo),

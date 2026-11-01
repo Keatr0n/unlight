@@ -95,12 +95,10 @@ fn crop_panel(ui: &mut Ui, state: &mut AppState, live: Option<&LivePhoto>) {
     let (orientation, aspect) = match live {
         Some(photo) => {
             let aspect = photo.sensor_aspect();
-            let display = if photo.orientation.swaps_axes() {
-                1.0 / aspect
-            } else {
-                aspect
-            };
-            (photo.orientation, display)
+            let turned = state.edit().map_or(Default::default(), |edit| edit.recipe.orientation);
+            let orientation = photo.orientation.then(turned);
+            let display = if orientation.swaps_axes() { 1.0 / aspect } else { aspect };
+            (orientation, display)
         }
         None => (Default::default(), 1.5),
     };
@@ -153,7 +151,9 @@ fn crop_panel(ui: &mut Ui, state: &mut AppState, live: Option<&LivePhoto>) {
 
     ui.add_space(theme::GRID);
     if let Some(edit) = state.edit_mut() {
-        let mut angle = edit.recipe.crop.angle;
+        // Dragging right should turn the photo clockwise on screen, flipped or not.
+        let on_screen = if orientation.mirrors() { -1.0 } else { 1.0 };
+        let mut angle = edit.recipe.crop.angle * on_screen;
         let result = Slider::new(&ANGLE, &mut angle, 0.0).show(ui);
         if let (Some(step), Some(photo)) = (result.change, live) {
             let framing = Framing {
@@ -163,7 +163,7 @@ fn crop_panel(ui: &mut Ui, state: &mut AppState, live: Option<&LivePhoto>) {
                 aspect: photo.sensor_aspect(),
             };
             let turned = Crop {
-                angle,
+                angle: angle * on_screen,
                 ..edit.recipe.crop
             };
             edit.recipe.crop = fit_inside(&turned, &framing);

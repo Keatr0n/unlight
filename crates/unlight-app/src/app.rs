@@ -194,6 +194,12 @@ impl App {
         let Some(row) = self.state.focused().cloned() else {
             return;
         };
+        if let Some(edit) = self.state.edit()
+            && edit.recipe.orientation != row.turned
+        {
+            let turned = edit.recipe.orientation;
+            self.state.library.set_turned(row.variant, turned);
+        }
         if self.focused == Some(row.variant) {
             return;
         }

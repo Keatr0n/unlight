@@ -3,29 +3,6 @@ use std::{fs::File, io::BufWriter, path::Path};
 use tiff::encoder::{TiffEncoder, colortype::RGB16};
 use unlight_color::{delta_e_2000, srgb_to_lab};
 
-type PixelMap = Box<dyn Fn(usize, usize) -> (usize, usize)>;
-
-/// Applies LibRaw's flip code to interleaved RGB. Returns pixels and the new size.
-pub fn orient(pixels: Vec<f32>, width: u32, height: u32, flip: i32) -> (Vec<f32>, u32, u32) {
-    let (w, h) = (width as usize, height as usize);
-    let (out_w, out_h, map): (usize, usize, PixelMap) = match flip {
-        3 => (w, h, Box::new(move |x, y| (w - 1 - x, h - 1 - y))),
-        5 => (h, w, Box::new(move |x, y| (y, w - 1 - x))),
-        6 => (h, w, Box::new(move |x, y| (h - 1 - y, x))),
-        _ => return (pixels, width, height),
-    };
-    let mut rotated = vec![0.0; pixels.len()];
-    for y in 0..h {
-        for x in 0..w {
-            let (tx, ty) = map(x, y);
-            let source = (y * w + x) * 3;
-            let target = (ty * out_w + tx) * 3;
-            rotated[target..target + 3].copy_from_slice(&pixels[source..source + 3]);
-        }
-    }
-    (rotated, out_w as u32, out_h as u32)
-}
-
 /// Copies a rectangle out of interleaved RGB.
 pub fn crop(pixels: &[f32], width: u32, [x, y, crop_width, crop_height]: [u32; 4]) -> Vec<f32> {
     let (width, x, crop_width) = (width as usize, x as usize, crop_width as usize);
@@ -104,36 +81,6 @@ mod tests {
 
     fn at(pixels: &[f32], width: usize, x: usize, y: usize) -> f32 {
         pixels[(y * width + x) * 3]
-    }
-
-    #[test]
-    fn no_flip_leaves_the_image_alone() {
-        let pixels = numbered(3, 2);
-        assert_eq!(orient(pixels.clone(), 3, 2, 0), (pixels, 3, 2));
-    }
-
-    #[test]
-    fn flip_3_is_a_half_turn() {
-        let (rotated, w, h) = orient(numbered(3, 2), 3, 2, 3);
-        assert_eq!((w, h), (3, 2));
-        assert_eq!(at(&rotated, 3, 0, 0), 5.0);
-        assert_eq!(at(&rotated, 3, 2, 1), 0.0);
-    }
-
-    #[test]
-    fn flip_6_turns_clockwise() {
-        let (rotated, w, h) = orient(numbered(3, 2), 3, 2, 6);
-        assert_eq!((w, h), (2, 3));
-        assert_eq!(at(&rotated, 2, 1, 0), 0.0);
-        assert_eq!(at(&rotated, 2, 0, 2), 5.0);
-    }
-
-    #[test]
-    fn flip_5_turns_counter_clockwise() {
-        let (rotated, w, h) = orient(numbered(3, 2), 3, 2, 5);
-        assert_eq!((w, h), (2, 3));
-        assert_eq!(at(&rotated, 2, 0, 2), 0.0);
-        assert_eq!(at(&rotated, 2, 1, 0), 5.0);
     }
 
     #[test]

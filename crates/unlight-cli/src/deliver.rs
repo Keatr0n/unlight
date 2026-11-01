@@ -1,13 +1,12 @@
 //! The whole path from a raw file to a finished, tagged image on disk.
 
-use crate::output;
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Datelike, Local, Timelike};
 use std::{path::Path, time::Instant};
 use unlight_engine::{ExportOptions, export};
 use unlight_output::{CaptureTime, ExportPreset, Image, ImageMetadata, write_image};
 use unlight_raw::Metadata;
-use unlight_recipe::Recipe;
+use unlight_recipe::{Orientation, Recipe};
 
 fn positive(value: f32) -> Option<f64> {
     (value > 0.0).then_some(f64::from(value))
@@ -70,12 +69,8 @@ pub fn run(files: &[impl AsRef<Path>], directory: &Path, preset: &str, recipe: &
         let start = Instant::now();
         let raw = unlight_raw::load(file).with_context(|| format!("decoding {}", file.display()))?;
         let rendered = export(&raw, recipe, &options)?;
-        let (pixels, width, height) = output::orient(
-            rendered.pixels,
-            rendered.width,
-            rendered.height,
-            raw.metadata.orientation,
-        );
+        let orientation = Orientation::from_libraw(raw.metadata.orientation).then(recipe.orientation);
+        let (pixels, width, height) = orientation.apply(rendered.pixels, rendered.width, rendered.height);
         let image = Image::new(width, height, settings.color_space, pixels)?;
         let metadata = image_metadata(file, &raw.metadata, index as u32 + 1);
         let path = write_image(&image, settings, &metadata, directory)?;

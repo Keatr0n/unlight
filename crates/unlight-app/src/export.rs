@@ -17,6 +17,7 @@ use unlight_catalog::{Catalog, VariantId};
 use unlight_engine::{ExportOptions, export};
 use unlight_output::{CaptureTime, ExportSettings, Image, ImageMetadata, write_image};
 use unlight_raw::Metadata;
+use unlight_recipe::Orientation;
 
 pub enum ExportEvent {
     Started { name: String },
@@ -82,29 +83,6 @@ fn image_metadata(file: &Path, meta: &Metadata, sequence: u32, rating: u8) -> Im
     }
 }
 
-/// Turns interleaved RGB to its display orientation, using LibRaw's flip codes.
-fn orient(pixels: Vec<f32>, width: u32, height: u32, flip: i32) -> (Vec<f32>, u32, u32) {
-    let (w, h) = (width as usize, height as usize);
-    let (out_w, out_h) = if matches!(flip, 5 | 6) { (h, w) } else { (w, h) };
-    if !matches!(flip, 3 | 5 | 6) {
-        return (pixels, width, height);
-    }
-    let mut turned = vec![0.0; pixels.len()];
-    for y in 0..h {
-        for x in 0..w {
-            let (to_x, to_y) = match flip {
-                3 => (w - 1 - x, h - 1 - y),
-                5 => (y, w - 1 - x),
-                _ => (h - 1 - y, x),
-            };
-            let from = (y * w + x) * 3;
-            let to = (to_y * out_w + to_x) * 3;
-            turned[to..to + 3].copy_from_slice(&pixels[from..from + 3]);
-        }
-    }
-    (turned, out_w as u32, out_h as u32)
-}
-
 enum Outcome {
     Written { device_losses: u32 },
     Skipped { device_losses: u32 },
@@ -130,8 +108,8 @@ fn export_one(
     };
     let rendered = export(&raw, &variant.recipe.effective(), &options)?;
     let device_losses = rendered.device_losses;
-    let flip = raw.metadata.orientation;
-    let (pixels, width, height) = orient(rendered.pixels, rendered.width, rendered.height, flip);
+    let orientation = Orientation::from_libraw(raw.metadata.orientation).then(variant.recipe.orientation);
+    let (pixels, width, height) = orientation.apply(rendered.pixels, rendered.width, rendered.height);
     let image = Image::new(width, height, settings.color_space, pixels)?;
     let metadata = image_metadata(&photo.path, &raw.metadata, sequence, variant.rating);
     match write_image(&image, settings, &metadata, directory) {
@@ -229,24 +207,6 @@ impl Drop for Exporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn pixel(pixels: &[f32], width: usize, x: usize, y: usize) -> f32 {
-        pixels[(y * width + x) * 3]
-    }
-
-    #[test]
-    fn orientation_matches_the_viewport() {
-        let pixels: Vec<f32> = (0..6).flat_map(|value| [value as f32; 3]).collect();
-        let (turned, width, height) = orient(pixels.clone(), 3, 2, 6);
-        assert_eq!((width, height), (2, 3));
-        assert_eq!(pixel(&turned, 2, 1, 0), 0.0);
-        let (turned, width, _) = orient(pixels.clone(), 3, 2, 5);
-        assert_eq!(pixel(&turned, width as usize, 0, 2), 0.0);
-        let (turned, ..) = orient(pixels.clone(), 3, 2, 3);
-        assert_eq!(pixel(&turned, 3, 2, 1), 0.0);
-        let (same, ..) = orient(pixels.clone(), 3, 2, 0);
-        assert_eq!(same, pixels);
-    }
 
     #[test]
     fn metadata_leaves_out_what_the_file_lacks() {

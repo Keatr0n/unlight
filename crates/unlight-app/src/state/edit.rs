@@ -150,8 +150,9 @@ impl PhotoEdit {
         self.note(&format!("Reset {}", section.title()), "", Step::New);
     }
 
+    /// Which way up a photo goes isn't an edit to undo with the rest.
     pub fn reset_all(&mut self) {
-        self.recipe = Recipe::default();
+        self.recipe = Recipe { orientation: self.recipe.orientation, ..Recipe::default() };
         self.note("Reset All", "", Step::New);
     }
 

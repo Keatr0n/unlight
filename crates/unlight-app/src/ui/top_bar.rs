@@ -1,7 +1,7 @@
 //! The bar across the top: name, what's open, and the module switch.
 
 use crate::{
-    action::{Action, tip},
+    action::{Action, TURNS, tip},
     state::{
         AppState, Dialog, Module,
         library::title,
@@ -14,6 +14,7 @@ use crate::{
 };
 use eframe::egui::{self, Align2, Frame, Panel, Response, Role, Sense, Ui, WidgetInfo, pos2, vec2};
 use unlight_raw::MergeKind;
+use unlight_recipe::Orientation;
 
 const TAB_WIDTH: f32 = 72.0;
 
@@ -81,6 +82,10 @@ fn photo_menu(ui: &mut Ui, state: &mut AppState) {
             ui.menu_button("Photo Merge", |ui| merge_items(ui, state));
         });
         ui.add_enabled_ui(state.library.selection_len() > 0, |ui| {
+            if let Some(turn) = turn_items(ui) {
+                state.apply(Action::Turn(turn));
+            }
+            ui.separator();
             if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
                 state.ask_to_remove_selection();
                 ui.close();
@@ -88,6 +93,18 @@ fn photo_menu(ui: &mut Ui, state: &mut AppState) {
         });
     });
     response.response.on_hover_text("Select two or more photos to merge them");
+}
+
+/// Rotate and flip, for any menu that acts on the selection.
+pub(crate) fn turn_items(ui: &mut Ui) -> Option<Orientation> {
+    let mut chosen = None;
+    for (label, turn) in TURNS {
+        if ui.button(tip(label, Action::Turn(turn))).clicked() {
+            chosen = Some(turn);
+            ui.close();
+        }
+    }
+    chosen
 }
 
 fn merge_items(ui: &mut Ui, state: &mut AppState) {

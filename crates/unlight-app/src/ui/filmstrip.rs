@@ -10,6 +10,8 @@ use crate::{
     },
     ui::{
         theme,
+        top_bar::turn_items,
+        viewport::paint_preview,
         widgets::{
             controls::divider,
             icons::{self, Icon},
@@ -21,6 +23,7 @@ use eframe::egui::{
     WidgetInfo, pos2, scroll_area::ScrollBarVisibility, vec2,
 };
 use unlight_catalog::{Flag, Label, LibraryRow, PhotoStatus};
+use unlight_recipe::Orientation;
 
 const CELL_WIDTH: f32 = 116.0;
 const CELL_HEIGHT: f32 = 76.0;
@@ -86,9 +89,7 @@ pub fn paint_badges(ui: &Ui, cell: Rect, row: &LibraryRow) {
 /// Fills a thumbnail's area with its picture, or a calm placeholder while it loads.
 pub fn paint_thumbnail(ui: &Ui, area: Rect, row: &LibraryRow, darkroom: &Darkroom) {
     if let Some(thumbnail) = darkroom.thumbnail(&row.path) {
-        let image = fitted(area, thumbnail.size_vec2());
-        let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
-        ui.painter().image(thumbnail.id(), image, uv, Color32::WHITE);
+        paint_preview(ui, area, thumbnail, row.turned);
     }
 }
 
@@ -97,6 +98,7 @@ struct CellResult {
     double_clicked: bool,
     right_clicked: bool,
     wants_remove: bool,
+    wants_turn: Option<Orientation>,
 }
 
 fn cell(
@@ -126,7 +128,9 @@ fn cell(
             .rect_stroke(rect, 3.0, (1.5, theme::HANDLE), StrokeKind::Inside);
     }
     let mut wants_remove = false;
+    let mut wants_turn = None;
     response.context_menu(|ui| {
+        wants_turn = turn_items(ui);
         if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
             wants_remove = true;
             ui.close();
@@ -137,6 +141,7 @@ fn cell(
         double_clicked: response.double_clicked(),
         right_clicked: response.secondary_clicked() && !selected,
         wants_remove,
+        wants_turn,
     };
     response.on_hover_text(title(row));
     result
@@ -195,6 +200,7 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
     let mut clicked = None;
     let mut opened = None;
     let mut wants_remove = false;
+    let mut wants_turn = None;
     ScrollArea::horizontal()
         .auto_shrink([false, false])
         .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
@@ -224,6 +230,7 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
                     opened = Some(index);
                 }
                 wants_remove |= result.wants_remove;
+                wants_turn = result.wants_turn.or(wants_turn);
             }
             if focus != last_scrolled {
                 if let Some(index) = focus {
@@ -245,5 +252,8 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
     }
     if wants_remove {
         state.ask_to_remove_selection();
+    }
+    if let Some(turn) = wants_turn {
+        state.apply(Action::Turn(turn));
     }
 }

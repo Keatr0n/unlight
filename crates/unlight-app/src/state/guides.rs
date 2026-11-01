@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn view_and_source_round_trip_through_a_warp() {
         let geometry = warped();
-        for orientation in [Orientation::Normal, Orientation::RotateCw, Orientation::RotateCcw] {
+        for orientation in Orientation::ALL {
             for view in [[0.2, 0.3], [0.5, 0.5], [0.8, 0.7]] {
                 let source = view_to_source(&geometry, view, orientation, ASPECT);
                 let back = source_to_view(&geometry, source, orientation, ASPECT);

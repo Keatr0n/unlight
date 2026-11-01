@@ -49,7 +49,7 @@ pub struct ViewportMemory {
 
 /// A quad showing the part `shown` of an image, turned to display orientation. `shown` is
 /// in 0..1 of the image as displayed.
-fn image_mesh(texture: TextureId, rect: Rect, shown: Rect, orientation: Orientation) -> Mesh {
+pub fn image_mesh(texture: TextureId, rect: Rect, shown: Rect, orientation: Orientation) -> Mesh {
     let mut mesh = Mesh::with_texture(texture);
     let corners = [
         (rect.left_top(), [shown.left(), shown.top()]),
@@ -70,7 +70,7 @@ fn image_mesh(texture: TextureId, rect: Rect, shown: Rect, orientation: Orientat
     mesh
 }
 
-fn unit_rect() -> Rect {
+pub fn unit_rect() -> Rect {
     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0))
 }
 
@@ -88,12 +88,13 @@ fn image_rect(pane: Rect, plan: &ViewPlan, pixels_per_point: f32) -> Rect {
     Rect::from_min_size(min, size)
 }
 
-/// Shows a preview fitted to an area. Previews come from the catalog already upright.
-fn paint_preview(ui: &Ui, area: Rect, preview: &egui::TextureHandle) -> Rect {
-    let [width, height] = preview.size().map(|side| side as f32);
+/// Shows a preview fitted to an area. Previews come from the catalog already upright, which
+/// leaves only the turn in the recipe.
+pub fn paint_preview(ui: &Ui, area: Rect, preview: &egui::TextureHandle, turned: Orientation) -> Rect {
+    let [width, height] = turned.display_size(preview.size().map(|side| side as u32)).map(|side| side as f32);
     let scale = (area.width() / width.max(1.0)).min(area.height() / height.max(1.0));
     let rect = Rect::from_center_size(area.center(), vec2(width, height) * scale);
-    let mesh = image_mesh(preview.id(), rect, unit_rect(), Orientation::Normal);
+    let mesh = image_mesh(preview.id(), rect, unit_rect(), turned);
     ui.painter().add(Shape::mesh(mesh));
     rect
 }
@@ -330,7 +331,7 @@ fn develop_live(ui: &mut Ui, app: &mut App, response: &Response, canvas: Rect, r
         before
     });
 
-    let orientation = live.orientation;
+    let orientation = live.orientation.then(recipe.orientation);
     let output = orientation.display_size(live.session.output_size(&recipe));
     let panes = panes(canvas, compare);
     let pane = panes.0[0];
@@ -574,7 +575,8 @@ pub fn show(ui: &mut Ui, app: &mut App, render_state: Option<&RenderState>) {
         Some(render_state) if live => develop_live(ui, app, &response, canvas, render_state),
         _ => {
             if let Some(preview) = app.darkroom.preview(&path) {
-                let rect = paint_preview(ui, canvas, preview);
+                let turned = app.state.edit().map_or(Default::default(), |edit| edit.recipe.orientation);
+                let rect = paint_preview(ui, canvas, preview, turned);
                 app.viewport.photo_rect = Some(rect);
             }
         }

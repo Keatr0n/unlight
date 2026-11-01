@@ -55,7 +55,7 @@ pub fn pick(state: &mut AppState, live: &mut LivePhoto, point: [f32; 2]) {
         WhiteBalance::Custom { temperature, tint } => (temperature, tint),
     };
     let target = live.session.view_target(SPOT_PIXELS, SPOT_PIXELS);
-    let [x, y] = live.orientation.to_sensor(point);
+    let [x, y] = live.orientation.then(edit.recipe.orientation).to_sensor(point);
     let region = [
         (x - SPOT_RADIUS).clamp(0.0, 1.0),
         (y - SPOT_RADIUS).clamp(0.0, 1.0),

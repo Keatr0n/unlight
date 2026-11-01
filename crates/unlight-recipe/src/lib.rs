@@ -42,6 +42,150 @@ pub struct Recipe {
     /// camera applies.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub camera_profile: Option<String>,
+    /// How the photo has been turned or flipped, on top of how the camera was held. The engine
+    /// renders sensor-up whatever this says, so it never costs a render.
+    #[serde(skip_serializing_if = "Orientation::is_normal")]
+    pub orientation: Orientation,
+}
+
+/// One of the eight ways to lay a rectangle down, as what happens to a sensor-up image to show
+/// it. Coordinates run 0..1 across the image.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Orientation {
+    #[default]
+    Normal,
+    Rotate180,
+    RotateCw,
+    RotateCcw,
+    /// Left and right swapped.
+    MirrorX,
+    /// Top and bottom swapped.
+    MirrorY,
+    /// Flipped about the diagonal through the top left corner.
+    Transpose,
+    /// Flipped about the diagonal through the top right corner.
+    Transverse,
+}
+
+impl Orientation {
+    pub const ALL: [Self; 8] = [
+        Self::Normal,
+        Self::Rotate180,
+        Self::RotateCw,
+        Self::RotateCcw,
+        Self::MirrorX,
+        Self::MirrorY,
+        Self::Transpose,
+        Self::Transverse,
+    ];
+
+    /// LibRaw's flip code: bit 0 mirrors columns, bit 1 mirrors rows, bit 2 swaps the axes.
+    pub fn from_libraw(flip: i32) -> Self {
+        match flip {
+            1 => Self::MirrorX,
+            2 => Self::MirrorY,
+            3 => Self::Rotate180,
+            4 => Self::Transpose,
+            5 => Self::RotateCcw,
+            6 => Self::RotateCw,
+            7 => Self::Transverse,
+            _ => Self::Normal,
+        }
+    }
+
+    pub fn is_normal(&self) -> bool {
+        *self == Self::Normal
+    }
+
+    pub fn swaps_axes(self) -> bool {
+        matches!(self, Self::RotateCw | Self::RotateCcw | Self::Transpose | Self::Transverse)
+    }
+
+    /// Whether this reverses handedness, so a clockwise turn on screen is anticlockwise in the
+    /// sensor image.
+    pub fn mirrors(self) -> bool {
+        matches!(self, Self::MirrorX | Self::MirrorY | Self::Transpose | Self::Transverse)
+    }
+
+    pub fn display_size(self, sensor: [u32; 2]) -> [u32; 2] {
+        if self.swaps_axes() { [sensor[1], sensor[0]] } else { sensor }
+    }
+
+    pub fn to_display(self, [x, y]: [f32; 2]) -> [f32; 2] {
+        match self {
+            Self::Normal => [x, y],
+            Self::Rotate180 => [1.0 - x, 1.0 - y],
+            Self::RotateCw => [1.0 - y, x],
+            Self::RotateCcw => [y, 1.0 - x],
+            Self::MirrorX => [1.0 - x, y],
+            Self::MirrorY => [x, 1.0 - y],
+            Self::Transpose => [y, x],
+            Self::Transverse => [1.0 - y, 1.0 - x],
+        }
+    }
+
+    pub fn inverse(self) -> Self {
+        match self {
+            Self::RotateCw => Self::RotateCcw,
+            Self::RotateCcw => Self::RotateCw,
+            other => other,
+        }
+    }
+
+    pub fn to_sensor(self, point: [f32; 2]) -> [f32; 2] {
+        self.inverse().to_display(point)
+    }
+
+    /// Converts an x, y, width, height rectangle from display to sensor coordinates.
+    pub fn sensor_region(self, [x, y, width, height]: [f32; 4]) -> [f32; 4] {
+        let [ax, ay] = self.to_sensor([x, y]);
+        let [bx, by] = self.to_sensor([x + width, y + height]);
+        [ax.min(bx), ay.min(by), (ax - bx).abs(), (ay - by).abs()]
+    }
+
+    /// This orientation with `next` done after it, so `next` happens as seen on screen.
+    pub fn then(self, next: Self) -> Self {
+        const CORNERS: [[f32; 2]; 3] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
+        let same = |candidate: &Self| {
+            CORNERS.iter().all(|corner| candidate.to_display(*corner) == next.to_display(self.to_display(*corner)))
+        };
+        Self::ALL.into_iter().find(same).unwrap_or_default()
+    }
+
+    /// Where pixel `x`, `y` of a `width` by `height` image lands.
+    fn display_pixel(self, x: usize, y: usize, width: usize, height: usize) -> (usize, usize) {
+        let (right, bottom) = (width - 1 - x, height - 1 - y);
+        match self {
+            Self::Normal => (x, y),
+            Self::Rotate180 => (right, bottom),
+            Self::RotateCw => (bottom, x),
+            Self::RotateCcw => (y, right),
+            Self::MirrorX => (right, y),
+            Self::MirrorY => (x, bottom),
+            Self::Transpose => (y, x),
+            Self::Transverse => (bottom, right),
+        }
+    }
+
+    /// Lays out interleaved RGB this way. Returns the pixels and their new size.
+    pub fn apply(self, pixels: Vec<f32>, width: u32, height: u32) -> (Vec<f32>, u32, u32) {
+        if self.is_normal() {
+            return (pixels, width, height);
+        }
+        let [out_width, out_height] = self.display_size([width, height]);
+        let (w, h) = (width as usize, height as usize);
+        let mut turned = vec![0.0; pixels.len()];
+        for y in 0..h {
+            for x in 0..w {
+                let (to_x, to_y) = self.display_pixel(x, y, w, h);
+                let from = (y * w + x) * 3;
+                let to = (to_y * out_width as usize + to_x) * 3;
+                turned[to..to + 3].copy_from_slice(&pixels[from..from + 3]);
+            }
+        }
+        (turned, out_width, out_height)
+    }
 }
 
 /// The Develop panels that have an on/off switch.
@@ -79,6 +223,7 @@ impl Default for Recipe {
             red_eye: Vec::new(),
             disabled_panels: Vec::new(),
             camera_profile: None,
+            orientation: Orientation::Normal,
         }
     }
 }
@@ -606,6 +751,109 @@ pub struct RedEye {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn four_turns_the_same_way_come_back_around() {
+        for start in Orientation::ALL {
+            for turn in [Orientation::RotateCw, Orientation::RotateCcw] {
+                let turned = (0..4).fold(start, |orientation, _| orientation.then(turn));
+                assert_eq!(turned, start);
+            }
+        }
+    }
+
+    #[test]
+    fn a_flip_undoes_itself_and_left_undoes_right() {
+        for start in Orientation::ALL {
+            assert_eq!(start.then(Orientation::MirrorX).then(Orientation::MirrorX), start);
+            assert_eq!(start.then(Orientation::MirrorY).then(Orientation::MirrorY), start);
+            assert_eq!(start.then(Orientation::RotateCw).then(Orientation::RotateCcw), start);
+        }
+    }
+
+    #[test]
+    fn orientations_combine_like_doing_one_then_the_other() {
+        let points = [[0.25, 0.125], [0.875, 0.375], [0.5, 0.75]];
+        for first in Orientation::ALL {
+            for second in Orientation::ALL {
+                let both = first.then(second);
+                for point in points {
+                    assert_eq!(both.to_display(point), second.to_display(first.to_display(point)));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn to_sensor_undoes_to_display() {
+        for orientation in Orientation::ALL {
+            let point = [0.25, 0.125];
+            assert_eq!(orientation.to_sensor(orientation.to_display(point)), point);
+        }
+    }
+
+    #[test]
+    fn a_flip_goes_the_way_it_looks_on_a_photo_the_camera_turned() {
+        let shown = Orientation::RotateCw.then(Orientation::MirrorX);
+        let [x, y] = Orientation::RotateCw.to_display([0.25, 0.125]);
+        assert_eq!(shown.to_display([0.25, 0.125]), [1.0 - x, y]);
+    }
+
+    #[test]
+    fn pixels_land_where_coordinates_say() {
+        let (width, height) = (3usize, 2usize);
+        let pixels: Vec<f32> = (0..width * height).flat_map(|value| [value as f32; 3]).collect();
+        for orientation in Orientation::ALL {
+            let (turned, out_width, out_height) = orientation.apply(pixels.clone(), 3, 2);
+            assert_eq!([out_width, out_height], orientation.display_size([3, 2]));
+            for y in 0..height {
+                for x in 0..width {
+                    let center = [(x as f32 + 0.5) / 3.0, (y as f32 + 0.5) / 2.0];
+                    let [u, v] = orientation.to_display(center);
+                    let (to_x, to_y) = ((u * out_width as f32) as usize, (v * out_height as f32) as usize);
+                    let found = turned[(to_y * out_width as usize + to_x) * 3];
+                    assert_eq!(found, (y * width + x) as f32, "{orientation:?} {x},{y}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flips_are_the_only_ones_that_reverse_handedness() {
+        for orientation in Orientation::ALL {
+            let [ox, oy] = orientation.to_display([0.0, 0.0]);
+            let [ax, ay] = orientation.to_display([1.0, 0.0]);
+            let [bx, by] = orientation.to_display([0.0, 1.0]);
+            let area = (ax - ox) * (by - oy) - (ay - oy) * (bx - ox);
+            assert_eq!(area < 0.0, orientation.mirrors(), "{orientation:?}");
+        }
+    }
+
+    #[test]
+    fn libraw_codes_match_their_bits() {
+        for flip in 0..8 {
+            let orientation = Orientation::from_libraw(flip);
+            assert_eq!(orientation.swaps_axes(), flip & 4 != 0, "{flip}");
+            let [x, y] = orientation.to_sensor([0.0, 0.0]);
+            assert_eq!((x == 1.0, y == 1.0), (flip & 1 != 0, flip & 2 != 0), "{flip}");
+        }
+    }
+
+    #[test]
+    fn an_unturned_recipe_says_nothing_about_it() {
+        let json = serde_json::to_string(&Recipe::default()).unwrap();
+        assert!(!json.contains("orientation"), "{json}");
+        let recipe: Recipe = serde_json::from_str(r#"{"process_version":1}"#).unwrap();
+        assert_eq!(recipe.orientation, Orientation::Normal);
+    }
+
+    #[test]
+    fn a_turn_survives_being_saved() {
+        let recipe = Recipe { orientation: Orientation::Transverse, ..Recipe::default() };
+        let json = serde_json::to_string(&recipe).unwrap();
+        assert!(json.contains(r#""orientation":"transverse""#), "{json}");
+        assert_eq!(serde_json::from_str::<Recipe>(&json).unwrap(), recipe);
+    }
 
     #[test]
     fn empty_json_gets_current_defaults() {

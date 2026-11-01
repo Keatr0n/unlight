@@ -43,7 +43,7 @@ No GPU? It'll run on Mesa's llvmpipe if you point `VK_DRIVER_FILES` at lavapipe'
 - White balance, the usual Basic sliders, Auto tone, parametric and point curves, HSL, black and white, colour grading and calibration
 - Sharpening, noise reduction, Texture, Clarity and Dehaze
 - Lens profiles, chromatic aberration, defringe, perspective, Upright and Guided Upright
-- Crop and straighten, post-crop vignette and grain
+- Crop and straighten, rotate and flip, post-crop vignette and grain
 - Brush, linear, radial, luminance range and colour range masks
 - Healing, clone and red-eye
 - History, snapshots, presets, copy and sync settings, before and after
@@ -80,6 +80,8 @@ They're mostly the Lightroom ones, so your fingers should already know them.
 `j`: clipping warning
 
 `s`: **s**oft proof (`shift+s` for the gamut warning)
+
+`ctrl+[` / `ctrl+]`: rotate left / right (flips are in the Photo and right-click menus)
 
 `ctrl+u`: Auto tone
 
@@ -133,6 +135,7 @@ Those are GPU times, I haven't measured slider to actual screen on a real displa
 - Panoramas cap out at 16384 px because a photo has to fit in one texture, so ten 61 MP frames come out at 25% scale.
 - Photo Merge has only been tested on synthetic sets made from real raws, plus some real 8-bit photos. It hasn't seen an actual raw bracket or raw pano yet.
 - Healing uses round spots, so you won't be removing any cars.
+- The Transform sliders and Upright work along the sensor's axes, so on a rotated or portrait photo Vertical goes sideways.
 - Auto tone is pretty conservative. It fixes badly exposed photos but barely touches good ones.
 - With heavy sharpening or noise reduction turned off, the preview can sit slightly off the export.
 - No HDR or wide gamut display output, it's all sRGB on screen.

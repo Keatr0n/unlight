@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use unlight_catalog::{Filter, Flag, Label, LibraryRow, Page, RAW_EXTENSIONS, Sort, VariantId};
+use unlight_recipe::Orientation;
 
 pub const PAGE_SIZE: u64 = 256;
 /// Loaded pages kept around, which comfortably covers a screen of the smallest thumbnails.
@@ -179,6 +180,14 @@ impl Library {
         self.refocus = place;
         if let Some(place) = place {
             self.need(place);
+        }
+    }
+
+    /// Keeps a loaded row's thumbnail the right way up as its edit changes.
+    pub fn set_turned(&mut self, variant: VariantId, turned: Orientation) {
+        let row = self.pages.values_mut().flatten().find(|row| row.variant == variant);
+        if let Some(row) = row {
+            row.turned = turned;
         }
     }
 
@@ -514,6 +523,7 @@ pub(crate) mod tests {
             width: 6000,
             height: 4000,
             orientation: 0,
+            turned: Orientation::Normal,
             rating: 0,
             flag: Flag::Unflagged,
             label: Label::None,

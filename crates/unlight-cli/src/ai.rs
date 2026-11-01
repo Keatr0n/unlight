@@ -13,7 +13,7 @@ use unlight_ai::{
     Worker, working_size,
 };
 use unlight_engine::{Engine, ExportOptions, GpuContext, Precision, Session, ViewRequest, export_with_scene, read_scene};
-use unlight_recipe::Recipe;
+use unlight_recipe::{Orientation, Recipe};
 
 const REPORT_EVERY_PERCENT: u64 = 10;
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -170,8 +170,8 @@ fn denoise(args: &DenoiseArgs) -> Result<()> {
 
     let options = ExportOptions { mask_rasters: mask_rasters(), ..ExportOptions::default() };
     let rendered = export_with_scene(&raw, &recipe, &options, &cleaned.pixels)?;
-    let (pixels, width, height) =
-        output::orient(rendered.pixels, rendered.width, rendered.height, raw.metadata.orientation);
+    let orientation = Orientation::from_libraw(raw.metadata.orientation).then(recipe.orientation);
+    let (pixels, width, height) = orientation.apply(rendered.pixels, rendered.width, rendered.height);
     output::save(&args.output, &pixels, width, height)
 }
 

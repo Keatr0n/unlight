@@ -7,8 +7,8 @@ use eframe::egui::{Event, Key, Modifiers, Pos2, Role, vec2};
 use egui_kittest::kittest::Queryable;
 use std::{fs, path::PathBuf, sync::Arc, thread, time::Duration};
 use support::{
-    Fixture, TestApp, WINDOW, drag, edit, library_app, open_app, recipe, row, save, settle, slider_rect,
-    steps,
+    Fixture, TestApp, WINDOW, drag, edit, let_settle, library_app, open_app, recipe, row, save, settle,
+    slider_rect, steps,
 };
 use unlight_app::{
     action::Action,
@@ -25,7 +25,7 @@ use unlight_app::{
 };
 use unlight_catalog::{Comparison, Filter, Flag, Label, Page, PhotoStatus, RatingFilter};
 use unlight_engine::Geometry;
-use unlight_recipe::{Crop, Upright};
+use unlight_recipe::{Crop, Orientation, Upright};
 
 fn store_of(app: &TestApp) -> Arc<Store> {
     app.state().store.clone()
@@ -524,6 +524,134 @@ fn a_removed_folder_clears_a_filter_on_it() {
     assert!(app.fixture.photos.join("photo-000.dng").is_file());
 }
 
+fn turned_in_the_catalog(app: &TestApp, variant: unlight_catalog::VariantId) -> Orientation {
+    let store = store_of(app);
+    store.flush();
+    store.catalog.variant(variant).unwrap().recipe.orientation
+}
+
+#[test]
+fn rotating_is_an_edit_that_can_be_undone() {
+    let mut app = library_app(1);
+    let variant = row(&app, 0).variant;
+    app.key_press_modifiers(Modifiers::COMMAND, Key::CloseBracket);
+    settle(&mut app, |app| {
+        app.state.edit().is_some_and(|edit| edit.recipe.orientation == Orientation::RotateCw)
+    });
+    let_settle(&mut app);
+    assert_eq!(turned_in_the_catalog(&app, variant), Orientation::RotateCw);
+    assert_eq!(row(&app, 0).turned, Orientation::RotateCw, "the thumbnail has to turn too");
+    assert_eq!(edit(&app).history().entries().last().unwrap().label, "Rotate Right");
+
+    app.state_mut().state.apply(Action::Undo);
+    let_settle(&mut app);
+    assert_eq!(recipe(&app).orientation, Orientation::Normal);
+    assert_eq!(turned_in_the_catalog(&app, variant), Orientation::Normal);
+    assert_eq!(row(&app, 0).turned, Orientation::Normal);
+}
+
+#[test]
+fn a_rotation_and_a_flip_stack_as_seen_on_screen() {
+    let mut app = library_app(1);
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCw));
+    app.state_mut().state.apply(Action::Turn(Orientation::MirrorX));
+    app.step();
+    assert_eq!(recipe(&app).orientation, Orientation::RotateCw.then(Orientation::MirrorX));
+}
+
+#[test]
+fn the_whole_selection_turns_together() {
+    let mut app = library_app(3);
+    app.state_mut().state.library.select(0);
+    app.state_mut().state.library.click(2, ClickKind::Extend);
+    app.step();
+    let variants = app.state().state.library.selection();
+    assert_eq!(variants.len(), 3);
+    app.state_mut().state.apply(Action::Turn(Orientation::MirrorY));
+    let_settle(&mut app);
+    settle(&mut app, |app| {
+        (0..3).all(|index| {
+            app.state.library.row(index).is_some_and(|row| row.turned == Orientation::MirrorY)
+        })
+    });
+    for variant in variants {
+        assert_eq!(turned_in_the_catalog(&app, variant), Orientation::MirrorY);
+    }
+}
+
+#[test]
+fn a_turn_comes_back_after_a_restart() {
+    let mut app = library_app(1);
+    let variant = row(&app, 0).variant;
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCcw));
+    let_settle(&mut app);
+    let reopened = reopen(app);
+    assert_eq!(recipe(&reopened).orientation, Orientation::RotateCcw);
+    assert_eq!(row(&reopened, 0).turned, Orientation::RotateCcw);
+    assert_eq!(turned_in_the_catalog(&reopened, variant), Orientation::RotateCcw);
+}
+
+#[test]
+fn reset_all_leaves_the_photo_the_way_up_it_was() {
+    let mut app = library_app(1);
+    app.state_mut().state.edit_mut().unwrap().recipe.basic.exposure = 1.0;
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCw));
+    app.state_mut().state.apply(Action::ResetAll);
+    app.step();
+    assert_eq!(recipe(&app).basic.exposure, 0.0);
+    assert_eq!(recipe(&app).orientation, Orientation::RotateCw);
+}
+
+#[test]
+fn pasting_settings_leaves_a_photo_the_way_up_it_was() {
+    let mut app = library_app(2);
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCw));
+    app.state_mut().state.edit_mut().unwrap().recipe.basic.exposure = 1.0;
+    app.state_mut().state.apply(Action::CopySettings);
+    app.step();
+    app.state_mut().state.apply(Action::Confirm);
+    app.state_mut().state.apply(Action::NextPhoto);
+    settle(&mut app, |app| {
+        app.state.library.focus() == Some(1) && app.state.edit().is_some()
+    });
+    app.state_mut().state.apply(Action::PasteSettings);
+    app.step();
+    assert_eq!(recipe(&app).basic.exposure, 1.0);
+    assert_eq!(recipe(&app).orientation, Orientation::Normal);
+}
+
+#[test]
+fn a_virtual_copy_turns_on_its_own() {
+    let mut app = library_app(1);
+    app.state_mut().state.apply(Action::VirtualCopy);
+    settle(&mut app, |app| {
+        app.state.library.count() == Some(2)
+            && app.state.focused().is_some_and(|row| row.copy_name.is_some())
+            && app.state.edit().is_some()
+    });
+    let copy = app.state().state.focused().unwrap().clone();
+    app.state_mut().state.apply(Action::Turn(Orientation::MirrorX));
+    let_settle(&mut app);
+    let original = store_of(&app).catalog.variants_of(copy.photo).unwrap()[0].id;
+    assert_eq!(turned_in_the_catalog(&app, copy.variant), Orientation::MirrorX);
+    assert_eq!(turned_in_the_catalog(&app, original), Orientation::Normal);
+}
+
+#[test]
+fn the_menus_offer_rotate_and_flip() {
+    let mut app = library_app(2);
+    let title = unlight_app::state::library::title(&row(&app, 1));
+    let target = row(&app, 1).variant;
+    app.get_by_label(&title).click_secondary();
+    app.step();
+    app.step();
+    app.step();
+    app.get_by_label("Flip Horizontal").click();
+    let_settle(&mut app);
+    assert_eq!(turned_in_the_catalog(&app, target), Orientation::MirrorX);
+    assert_eq!(recipe(&app).orientation, Orientation::MirrorX);
+}
+
 #[test]
 fn keywords_land_on_the_selection_and_can_be_filtered_by() {
     let mut app = library_app(2);
@@ -722,6 +850,40 @@ fn start_export(app: &mut TestApp, directory: &std::path::Path) {
     save(app, "export_form");
     app.get_by_label("Export").click();
     app.step();
+}
+
+/// Width and height from a JPEG's frame header.
+fn jpeg_size(path: &std::path::Path) -> (u32, u32) {
+    let bytes = fs::read(path).unwrap();
+    let field = |at: usize| u32::from(u16::from_be_bytes([bytes[at], bytes[at + 1]]));
+    let mut at = 2;
+    while !(0xC0..=0xC2).contains(&bytes[at + 1]) {
+        at += 2 + field(at + 2) as usize;
+    }
+    (field(at + 7), field(at + 5))
+}
+
+#[test]
+fn a_turned_photo_exports_turned() {
+    let mut app = library_app(1);
+    let plain = app.fixture.dir.path().join("plain");
+    start_export(&mut app, &plain);
+    settle(&mut app, |app| app.state.export_run.as_ref().is_some_and(|run| run.finished));
+    app.get_by_label("Done").click();
+    app.step();
+    app.step();
+    let (width, height) = jpeg_size(&exports_in(&plain)[0]);
+    assert_ne!(width, height);
+
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCw));
+    let_settle(&mut app);
+    let turned = app.fixture.dir.path().join("turned");
+    start_export(&mut app, &turned);
+    let written = turned.clone();
+    settle(&mut app, move |app| {
+        app.state.export_run.as_ref().is_some_and(|run| run.finished) && !exports_in(&written).is_empty()
+    });
+    assert_eq!(jpeg_size(&exports_in(&turned)[0]), (height, width));
 }
 
 #[test]

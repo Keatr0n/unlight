@@ -362,8 +362,9 @@ impl CropGesture {
         }
     }
 
-    /// The rectangle and angle for the pointer's current position.
-    pub fn update(&self, point: [f32; 2], lock: Option<f32>) -> (CropRect, f32) {
+    /// The rectangle and angle for the pointer's current position. `mirrored` says the photo is
+    /// shown flipped, so a turn on screen goes the other way in the image.
+    pub fn update(&self, point: [f32; 2], lock: Option<f32>, mirrored: bool) -> (CropRect, f32) {
         let delta = [point[0] - self.start_point[0], point[1] - self.start_point[1]];
         match self.grip {
             CropGrip::Move => (move_rect(&self.start, delta), self.start_angle),
@@ -375,7 +376,8 @@ impl CropGesture {
                 let center = self.start.center();
                 let from = pointer_angle(self.start_point, center, self.photo_aspect);
                 let to = pointer_angle(point, center, self.photo_aspect);
-                let angle = self.start_angle - angle_delta(from, to);
+                let turn = angle_delta(from, to);
+                let angle = self.start_angle + if mirrored { turn } else { -turn };
                 (self.start, angle.clamp(-MAX_ANGLE, MAX_ANGLE))
             }
         }
@@ -591,11 +593,7 @@ mod tests {
             bottom: 0.9,
             angle: 1.0,
         };
-        for orientation in [
-            Orientation::RotateCw,
-            Orientation::RotateCcw,
-            Orientation::Rotate180,
-        ] {
+        for orientation in Orientation::ALL {
             let mut back = Crop {
                 angle: 1.0,
                 ..Crop::default()
@@ -659,15 +657,17 @@ mod tests {
             bottom: 0.6,
         };
         let gesture = CropGesture::new(CropGrip::Move, start, 0.0, [0.4, 0.4], ASPECT);
-        gesture.update([0.9, 0.9], None);
-        let (rect, _) = gesture.update([0.5, 0.4], None);
+        gesture.update([0.9, 0.9], None, false);
+        let (rect, _) = gesture.update([0.5, 0.4], None, false);
         assert!(close(rect.left, 0.3) && close(rect.top, 0.2));
     }
 
     #[test]
     fn dragging_clockwise_outside_turns_the_photo_clockwise() {
         let gesture = CropGesture::new(CropGrip::Rotate, CropRect::FULL, 0.0, [1.0, 0.5], ASPECT);
-        let (_, angle) = gesture.update([1.0, 0.6], None);
+        let (_, angle) = gesture.update([1.0, 0.6], None, false);
+        let (_, flipped) = gesture.update([1.0, 0.6], None, true);
+        assert_eq!(flipped, -angle, "a flipped photo straightens the other way");
         assert!(angle < 0.0, "{angle}");
     }
 

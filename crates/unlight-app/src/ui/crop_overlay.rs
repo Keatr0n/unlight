@@ -112,7 +112,7 @@ pub fn interact(
         {
             let tool = state.crop_tool;
             let lock = tool.lock.ratio(photo_aspect, tool.portrait);
-            let (moved, angle) = active.update(space.to_photo(pos), lock);
+            let (moved, angle) = active.update(space.to_photo(pos), lock, orientation.mirrors());
             if let Some(edit) = state.edit_mut() {
                 let mut crop = edit.recipe.crop;
                 moved.apply_to(&mut crop, orientation);

@@ -7,12 +7,14 @@ use crate::{
     ui::{
         filmstrip::{click_kind, paint_badges, paint_thumbnail},
         theme,
+        top_bar::turn_items,
         widgets::controls::text_button,
     },
 };
 use eframe::egui::{Align2, Rect, Role, ScrollArea, Sense, StrokeKind, Ui, WidgetInfo, pos2, vec2};
 use unlight_catalog::{Filter, LibraryRow};
 use unlight_raw::MergeKind;
+use unlight_recipe::Orientation;
 
 const GAP: f32 = 8.0;
 const MARGIN: f32 = 12.0;
@@ -79,6 +81,7 @@ fn card(
         wants_copy,
         wants_merge,
         wants_remove,
+        wants_turn,
         ..
     } = clicks;
     let can_merge = app.state.can_merge();
@@ -134,6 +137,7 @@ fn card(
                 }
             });
         });
+        *wants_turn = turn_items(ui).or(*wants_turn);
         if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
             *wants_remove = true;
             ui.close();
@@ -154,6 +158,7 @@ struct GridClicks {
     wants_copy: bool,
     wants_merge: Option<MergeKind>,
     wants_remove: bool,
+    wants_turn: Option<Orientation>,
 }
 
 fn visible_rows(
@@ -245,5 +250,8 @@ pub fn show(ui: &mut Ui, app: &mut App) {
     }
     if clicks.wants_remove {
         app.state.ask_to_remove_selection();
+    }
+    if let Some(turn) = clicks.wants_turn {
+        app.state.apply(Action::Turn(turn));
     }
 }

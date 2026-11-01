@@ -5,13 +5,14 @@ use crate::{
     app::App,
     state::{SURVEY_LIMIT, library::title},
     ui::{
-        filmstrip::{fitted, paint_badges},
+        filmstrip::paint_badges,
         theme,
+        viewport::paint_preview,
         widgets::{controls::icon_button, icons::Icon},
     },
 };
 use eframe::egui::{
-    self, Align2, Color32, Rect, Role, Sense, StrokeKind, Ui, UiBuilder, WidgetInfo, pos2, vec2,
+    self, Align2, Rect, Role, Sense, StrokeKind, Ui, UiBuilder, WidgetInfo, pos2, vec2,
 };
 use unlight_catalog::LibraryRow;
 
@@ -25,10 +26,7 @@ fn paint_photo(ui: &Ui, area: Rect, row: &LibraryRow, app: &App) -> Rect {
         ui.painter().rect_filled(area, 2.0, theme::PANEL);
         return area;
     };
-    let rect = fitted(area, texture.size_vec2());
-    let uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
-    ui.painter().image(texture.id(), rect, uv, Color32::WHITE);
-    rect
+    paint_preview(ui, area, texture, row.turned)
 }
 
 fn caption(ui: &Ui, area: Rect, row: &LibraryRow, role: Option<&str>) {

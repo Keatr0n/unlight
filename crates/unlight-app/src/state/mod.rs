@@ -20,7 +20,7 @@ pub mod view;
 pub mod white_balance;
 pub mod write;
 
-use crate::action::Action;
+use crate::action::{Action, turn_label};
 use clipboard::{CopiedSettings, SettingSelection, narrow_preset, partial_recipe};
 use crop::{AspectLock, CropRect, CropTool, fit_ratio};
 use edit::{PhotoEdit, Step};
@@ -613,6 +613,24 @@ impl AppState {
             Action::ToolSmaller => self.resize_tool(-1),
             Action::ToolLarger => self.resize_tool(1),
             Action::DeleteSelected => self.delete_selected(),
+            Action::Turn(turn) => self.turn_selection(turn),
+        }
+    }
+
+    /// The open photo turns here so it answers at once. The rest of the selection is the
+    /// catalog's job.
+    fn turn_selection(&mut self, turn: Orientation) {
+        let focused = self.focused().map(|row| row.variant).filter(|id| self.edits.contains_key(id));
+        let others: Vec<VariantId> =
+            self.library.selection().into_iter().filter(|id| Some(*id) != focused).collect();
+        if focused.is_some()
+            && let Some(edit) = self.edit_mut()
+        {
+            edit.recipe.orientation = edit.recipe.orientation.then(turn);
+            edit.note(turn_label(turn), "", Step::New);
+        }
+        if !others.is_empty() {
+            self.writes.push(Write::TurnVariants { variants: others, turn });
         }
     }
 

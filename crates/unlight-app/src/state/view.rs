@@ -1,63 +1,7 @@
 //! Zoom and pan arithmetic. The photo is addressed in display orientation everywhere in the
 //! UI; `Orientation` converts to the sensor orientation the engine renders in.
 
-/// How the camera was held. The engine renders sensor-up, so the viewport turns the result.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Orientation {
-    #[default]
-    Normal,
-    Rotate180,
-    RotateCw,
-    RotateCcw,
-}
-
-impl Orientation {
-    pub fn from_libraw(flip: i32) -> Self {
-        match flip {
-            3 => Self::Rotate180,
-            5 => Self::RotateCcw,
-            6 => Self::RotateCw,
-            _ => Self::Normal,
-        }
-    }
-
-    pub fn swaps_axes(self) -> bool {
-        matches!(self, Self::RotateCw | Self::RotateCcw)
-    }
-
-    pub fn display_size(self, sensor: [u32; 2]) -> [u32; 2] {
-        if self.swaps_axes() {
-            [sensor[1], sensor[0]]
-        } else {
-            sensor
-        }
-    }
-
-    pub fn to_sensor(self, [x, y]: [f32; 2]) -> [f32; 2] {
-        match self {
-            Self::Normal => [x, y],
-            Self::Rotate180 => [1.0 - x, 1.0 - y],
-            Self::RotateCw => [y, 1.0 - x],
-            Self::RotateCcw => [1.0 - y, x],
-        }
-    }
-
-    pub fn to_display(self, [x, y]: [f32; 2]) -> [f32; 2] {
-        match self {
-            Self::Normal => [x, y],
-            Self::Rotate180 => [1.0 - x, 1.0 - y],
-            Self::RotateCw => [1.0 - y, x],
-            Self::RotateCcw => [y, 1.0 - x],
-        }
-    }
-
-    /// Converts an x, y, width, height rectangle from display to sensor coordinates.
-    pub fn sensor_region(self, [x, y, width, height]: [f32; 4]) -> [f32; 4] {
-        let [ax, ay] = self.to_sensor([x, y]);
-        let [bx, by] = self.to_sensor([x + width, y + height]);
-        [ax.min(bx), ay.min(by), (ax - bx).abs(), (ay - by).abs()]
-    }
-}
+pub use unlight_recipe::Orientation;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Zoom {

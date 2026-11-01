@@ -2,7 +2,10 @@
 //! holds up a frame and a later write can't overtake an earlier one. Page queries run on
 //! another, and scans and sidecars each have their own.
 
-use crate::state::{CatalogLists, library::PageRequest, write::Write};
+use crate::{
+    action::turn_label,
+    state::{CatalogLists, library::PageRequest, write::Write},
+};
 use anyhow::{Context, Result};
 use std::{
     collections::HashSet,
@@ -19,6 +22,7 @@ use unlight_catalog::{
     CancelToken, Catalog, Filter, LibraryRow, Page, PreviewCache, ScanProgress, ScanReport, Snapshot, Sort,
     VariantId,
 };
+use unlight_recipe::Orientation;
 
 const SCAN_PROGRESS_INTERVAL: Duration = Duration::from_millis(40);
 /// Pause between sidecars, so a burst of them leaves the catalog free for edits.
@@ -250,6 +254,15 @@ fn paste_onto(
     Ok(())
 }
 
+fn turn_variants(catalog: &Catalog, variants: &[VariantId], turn: Orientation) -> unlight_catalog::Result<()> {
+    for variant in variants {
+        let mut recipe = catalog.variant(*variant)?.recipe;
+        recipe.orientation = recipe.orientation.then(turn);
+        catalog.save_recipe(*variant, &recipe, turn_label(turn))?;
+    }
+    Ok(())
+}
+
 /// Applies one write. Returns what the UI should hear about it.
 fn apply(catalog: &Catalog, write: Write) -> unlight_catalog::Result<Vec<StoreEvent>> {
     let lists =
@@ -303,6 +316,10 @@ fn apply(catalog: &Catalog, write: Write) -> unlight_catalog::Result<Vec<StoreEv
         }
         Write::VirtualCopy(source) => {
             vec![StoreEvent::VariantCreated(catalog.create_virtual_copy(source)?)]
+        }
+        Write::TurnVariants { variants, turn } => {
+            turn_variants(catalog, &variants, turn)?;
+            vec![StoreEvent::RecipesChanged(variants)]
         }
         Write::RemoveVariants(variants) => {
             let removed = remove_variants(catalog, &variants)?;

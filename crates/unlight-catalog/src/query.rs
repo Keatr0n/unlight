@@ -7,6 +7,7 @@ use crate::{
 };
 use rusqlite::{Connection, Row, params_from_iter, types::Value};
 use std::path::{Path, PathBuf};
+use unlight_recipe::Orientation;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RatingFilter {
@@ -85,6 +86,8 @@ pub struct LibraryRow {
     pub label: Label,
     pub copy_name: Option<String>,
     pub edited: bool,
+    /// How this variant's recipe turns the photo, on top of `orientation`.
+    pub turned: Orientation,
 }
 
 impl LibraryRow {
@@ -100,7 +103,8 @@ impl LibraryRow {
 const FROM: &str = "FROM variants v JOIN photos p ON p.id = v.photo_id";
 const ROW_COLUMNS: &str = "v.id, v.photo_id, f.path, p.file_name, p.fingerprint, p.status,
     p.capture_time, p.width, p.height, p.orientation, v.rating, v.flag, v.label, v.copy_name,
-    v.edited_at";
+    v.edited_at,
+    (SELECT json_extract(r.recipe, '$.orientation') FROM variant_recipes r WHERE r.variant_id = v.id)";
 
 fn row_from_sql(row: &Row) -> rusqlite::Result<LibraryRow> {
     let folder: String = row.get(2)?;
@@ -120,6 +124,10 @@ fn row_from_sql(row: &Row) -> rusqlite::Result<LibraryRow> {
         label: row.get(12)?,
         copy_name: row.get(13)?,
         edited: row.get::<_, Option<i64>>(14)?.is_some(),
+        turned: row
+            .get::<_, Option<String>>(15)?
+            .and_then(|name| serde_json::from_value(name.into()).ok())
+            .unwrap_or_default(),
     })
 }
 

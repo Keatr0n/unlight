@@ -21,7 +21,7 @@ use std::{
 use unlight_engine::{
     Engine, ExportOptions, GpuContext, Precision, Session, ViewRequest, export, stall_device,
 };
-use unlight_recipe::Recipe;
+use unlight_recipe::{Orientation, Recipe};
 
 #[derive(Parser)]
 #[command(name = "unlight-cli", about = "Render and benchmark raw photos from the command line")]
@@ -188,8 +188,8 @@ fn render(
     let render = render_start.elapsed();
 
     let (tiles, device_losses) = (image.tiles, image.device_losses);
-    let (pixels, width, height) =
-        output::orient(image.pixels, image.width, image.height, raw.metadata.orientation);
+    let orientation = Orientation::from_libraw(raw.metadata.orientation).then(recipe.orientation);
+    let (pixels, width, height) = orientation.apply(image.pixels, image.width, image.height);
     let (pixels, width, height) = match crop {
         Some(&[x, y, crop_width, crop_height]) => {
             (output::crop(&pixels, width, [x, y, crop_width, crop_height]), crop_width, crop_height)
