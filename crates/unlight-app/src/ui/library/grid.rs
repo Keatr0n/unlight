@@ -1,7 +1,7 @@
 //! The thumbnail grid. Only the rows on screen exist, whatever the size of the library.
 
 use crate::{
-    action::Action,
+    action::{Action, tip},
     app::App,
     state::{Dialog, library::title},
     ui::{
@@ -63,6 +63,7 @@ fn empty_state(ui: &mut Ui, app: &mut App) {
 struct Cell {
     clicked: bool,
     double_clicked: bool,
+    right_clicked: bool,
 }
 
 fn card(
@@ -77,6 +78,7 @@ fn card(
         wants_collection,
         wants_copy,
         wants_merge,
+        wants_remove,
         ..
     } = clicks;
     let can_merge = app.state.can_merge();
@@ -112,6 +114,7 @@ fn card(
             .rect_stroke(rect, 4.0, (1.5, theme::HANDLE), StrokeKind::Inside);
     }
     let (clicked, double_clicked) = (response.clicked(), response.double_clicked());
+    let right_clicked = response.secondary_clicked() && !selected;
     response.context_menu(|ui| {
         if ui.button("New Collection from Selection…").clicked() {
             *wants_collection = true;
@@ -131,10 +134,15 @@ fn card(
                 }
             });
         });
+        if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
+            *wants_remove = true;
+            ui.close();
+        }
     });
     Cell {
         clicked,
         double_clicked,
+        right_clicked,
     }
 }
 
@@ -145,6 +153,7 @@ struct GridClicks {
     wants_collection: bool,
     wants_copy: bool,
     wants_merge: Option<MergeKind>,
+    wants_remove: bool,
 }
 
 fn visible_rows(
@@ -173,7 +182,8 @@ fn visible_rows(
         };
         app.darkroom.show_row(&data);
         let result = card(ui, rect, &data, app, focus == Some(index), clicks);
-        if result.clicked {
+        // The menu acts on the selection, so a photo that's right-clicked has to be part of it.
+        if result.clicked || result.right_clicked {
             clicks.click = Some(index);
         }
         if result.double_clicked {
@@ -232,5 +242,8 @@ pub fn show(ui: &mut Ui, app: &mut App) {
     }
     if let Some(kind) = clicks.wants_merge {
         app.state.apply(Action::PhotoMerge(kind));
+    }
+    if clicks.wants_remove {
+        app.state.ask_to_remove_selection();
     }
 }

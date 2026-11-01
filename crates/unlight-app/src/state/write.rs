@@ -3,7 +3,8 @@
 
 use super::clipboard::CopiedSettings;
 use unlight_catalog::{
-    CollectionId, Flag, KeywordId, Label, PartialRecipe, PhotoId, PresetId, SmartRules, SnapshotId, VariantId,
+    CollectionId, Flag, FolderId, KeywordId, Label, PartialRecipe, PhotoId, PresetId, SmartRules, SnapshotId,
+    VariantId,
 };
 use unlight_recipe::Recipe;
 
@@ -29,6 +30,10 @@ pub enum Write {
     SetRating(Vec<VariantId>, u8),
     SetLabel(Vec<VariantId>, Label),
     VirtualCopy(VariantId),
+    /// Takes variants out of the catalog. A master takes its photo and any copies with it.
+    RemoveVariants(Vec<VariantId>),
+    /// Takes a folder, its subfolders and their photos out of the catalog.
+    RemoveFolder(FolderId),
     PasteSettings {
         variants: Vec<VariantId>,
         settings: Box<CopiedSettings>,

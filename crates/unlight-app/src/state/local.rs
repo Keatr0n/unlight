@@ -2,7 +2,7 @@
 //! edits they make to a recipe. Positions are all in source coordinates, as the recipe stores
 //! them, so a tool's work follows the crop and every warp.
 
-use super::{AppState, Tool, edit::Step};
+use super::{AppState, Module, Tool, edit::Step};
 use unlight_recipe::{BrushDab, HealMode, HealSpot, Mask, MaskComponent, MaskShape, Recipe, RedEye};
 
 const MIN_BRUSH: f32 = 0.0005;
@@ -432,10 +432,16 @@ impl AppState {
         }
     }
 
-    /// The Delete key: removes whatever the current tool has selected.
+    /// The Delete key: removes whatever the current tool has selected, or with no tool in
+    /// hand, the selected photos.
     pub fn delete_selected(&mut self) {
         let (spot, eye) = (self.local.spot, self.local.eye);
+        if self.module == Module::Library {
+            self.ask_to_remove_selection();
+            return;
+        }
         match self.tool {
+            Tool::None => self.ask_to_remove_selection(),
             Tool::Masks => self.delete_mask(),
             Tool::Heal => {
                 if let Some(index) = spot {

@@ -78,6 +78,7 @@ fn catalog_section(ui: &mut Ui, state: &mut AppState) {
 struct FolderClicks {
     open: Option<FolderId>,
     rescan: Option<usize>,
+    remove: Option<usize>,
 }
 
 fn folders_section(ui: &mut Ui, state: &mut AppState) {
@@ -94,6 +95,10 @@ fn folders_section(ui: &mut Ui, state: &mut AppState) {
             row.context_menu(|ui| {
                 if ui.button("Rescan").clicked() {
                     clicks.rescan = Some(index);
+                    ui.close();
+                }
+                if ui.button("Remove from Catalog…").clicked() {
+                    clicks.remove = Some(index);
                     ui.close();
                 }
             });
@@ -117,6 +122,10 @@ fn folders_section(ui: &mut Ui, state: &mut AppState) {
             ..state.library.filter().clone()
         };
         state.library.set_filter(filter);
+    }
+    if let Some(folder) = clicks.remove.and_then(|index| state.lists.folders.get(index)) {
+        let name = folder.path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        state.dialog = Some(Dialog::RemoveFolder { folder: folder.id, name });
     }
     if let Some(root) = clicks
         .rescan

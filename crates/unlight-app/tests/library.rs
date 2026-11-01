@@ -283,6 +283,247 @@ fn a_virtual_copy_is_its_own_edit() {
     assert_eq!(master[1].recipe.basic.exposure, -1.0);
 }
 
+/// Says yes in the dialog that's open and waits for the catalog to be `left` photos big.
+fn confirm_removal(app: &mut TestApp, left: u64) {
+    app.get_by_label("Remove").click();
+    settle(app, |app| app.state.dialog.is_none() && app.state.library.count() == Some(left));
+}
+
+#[test]
+fn delete_asks_first_and_cancelling_changes_nothing() {
+    let mut app = library_app(3);
+    app.key_press(Key::Delete);
+    app.step();
+    assert!(matches!(app.state().state.dialog, Some(Dialog::RemovePhotos { .. })));
+    app.get_by_label("Cancel").click();
+    app.step();
+    app.step();
+    assert_eq!(app.state().state.dialog, None);
+    let store = store_of(&app);
+    store.flush();
+    assert_eq!(store.catalog.count(&Filter::default()).unwrap(), 3);
+}
+
+#[test]
+fn removing_a_photo_leaves_its_file_and_moves_on_to_the_next() {
+    let mut app = library_app(3);
+    app.state_mut().state.library.select(1);
+    app.step();
+    let (gone, next) = (row(&app, 1), row(&app, 2));
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 2);
+    settle(&mut app, |app| app.state.edit().is_some());
+    let focused = app.state().state.focused().unwrap().clone();
+    assert_eq!(focused.variant, next.variant);
+    assert_eq!(app.state().state.library.selection(), vec![next.variant]);
+    assert!(gone.path.is_file(), "the file has to stay on disk");
+    assert_eq!(app.state().state.status(), None);
+}
+
+#[test]
+fn removing_the_last_photo_in_the_list_steps_back_onto_the_one_before() {
+    let mut app = library_app(3);
+    app.state_mut().state.library.select(2);
+    app.step();
+    let before = row(&app, 1);
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 2);
+    settle(&mut app, |app| app.state.focused().is_some());
+    assert_eq!(app.state().state.focused().unwrap().variant, before.variant);
+}
+
+#[test]
+fn a_selection_goes_together() {
+    let mut app = library_app(4);
+    app.state_mut().state.library.select(0);
+    app.state_mut().state.library.click(2, ClickKind::Extend);
+    app.step();
+    let last = row(&app, 3);
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 1);
+    settle(&mut app, |app| app.state.focused().is_some());
+    assert_eq!(app.state().state.focused().unwrap().variant, last.variant);
+}
+
+#[test]
+fn the_whole_catalog_can_be_emptied() {
+    let mut app = library_app(2);
+    app.state_mut().state.apply(Action::SelectAll);
+    settle(&mut app, |app| app.state.library.selection_len() == 2);
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 0);
+    assert_eq!(app.state().state.focused(), None);
+    assert_eq!(app.state().state.library.selection(), Vec::new());
+    for _ in 0..6 {
+        app.step();
+    }
+    assert_eq!(app.state().state.status(), None);
+}
+
+#[test]
+fn an_unsaved_edit_on_a_removed_photo_goes_quietly() {
+    let mut app = library_app(2);
+    app.state_mut().state.edit_mut().unwrap().recipe.basic.exposure = 1.0;
+    let gone = row(&app, 0).variant;
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 1);
+    for _ in 0..6 {
+        app.step();
+    }
+    assert!(!app.state().state.edits.contains_key(&gone));
+    assert_eq!(app.state().state.status(), None);
+}
+
+#[test]
+fn removing_a_virtual_copy_keeps_the_original() {
+    let mut app = library_app(1);
+    app.state_mut().state.apply(Action::VirtualCopy);
+    settle(&mut app, |app| {
+        app.state.library.count() == Some(2)
+            && app.state.focused().is_some_and(|row| row.copy_name.is_some())
+    });
+    let copy = app.state().state.focused().unwrap().clone();
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 1);
+    let store = store_of(&app);
+    store.flush();
+    let left = store.catalog.variants_of(copy.photo).unwrap();
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].copy_name, None);
+}
+
+#[test]
+fn removing_an_original_takes_its_virtual_copies_too() {
+    let mut app = library_app(2);
+    app.state_mut().state.apply(Action::VirtualCopy);
+    settle(&mut app, |app| {
+        app.state.library.count() == Some(3)
+            && app.state.focused().is_some_and(|row| row.copy_name.is_some())
+    });
+    let copy = app.state().state.focused().unwrap().clone();
+    let original = store_of(&app).catalog.variants_of(copy.photo).unwrap()[0].id;
+    let index = (0..3).find(|index| row(&app, *index).variant == original).unwrap();
+    app.state_mut().state.library.select(index);
+    app.step();
+    app.key_press(Key::Delete);
+    app.step();
+    confirm_removal(&mut app, 1);
+    let store = store_of(&app);
+    store.flush();
+    assert!(store.catalog.variants_of(copy.photo).unwrap().is_empty());
+    let edits = &app.state().state.edits;
+    assert!(!edits.contains_key(&original) && !edits.contains_key(&copy.variant));
+}
+
+#[test]
+fn delete_in_develop_only_removes_a_photo_with_no_tool_in_hand() {
+    let mut app = library_app(1);
+    app.state_mut().state.apply(Action::ShowDevelop);
+    app.state_mut().state.apply(Action::ToggleTool(Tool::Masks));
+    app.step();
+    app.key_press(Key::Delete);
+    app.step();
+    assert_eq!(app.state().state.dialog, None);
+    app.state_mut().state.apply(Action::ToggleTool(Tool::Masks));
+    app.step();
+    app.key_press(Key::Delete);
+    app.step();
+    assert!(matches!(app.state().state.dialog, Some(Dialog::RemovePhotos { .. })));
+}
+
+#[test]
+fn right_clicking_a_photo_selects_it_before_the_menu_acts() {
+    let mut app = library_app(3);
+    let target = row(&app, 2).variant;
+    let title = unlight_app::state::library::title(&row(&app, 2));
+    app.step();
+    app.get_by_label(&title).click_secondary();
+    app.step();
+    app.step();
+    assert_eq!(app.state().state.library.selection(), vec![target]);
+}
+
+#[test]
+fn the_menus_lead_to_the_same_question() {
+    let mut app = library_app(3);
+    let title = unlight_app::state::library::title(&row(&app, 1));
+    let target = row(&app, 1).variant;
+    let open_menu = "Remove from Catalog…  (Delete)";
+
+    app.get_by_label(&title).click_secondary();
+    app.step();
+    app.step();
+    app.step();
+    app.get_by_label(open_menu).click();
+    app.step();
+    app.step();
+    let filmstrip = Dialog::RemovePhotos { variants: vec![target] };
+    assert_eq!(app.state().state.dialog, Some(filmstrip.clone()));
+    app.state_mut().state.dialog = None;
+
+    app.state_mut().state.apply(Action::ShowGrid);
+    app.state_mut().state.apply(Action::ToggleFilmstrip);
+    app.state_mut().state.library.select(0);
+    app.step();
+    app.step();
+    app.get_by_label(&title).click_secondary();
+    app.step();
+    app.step();
+    app.step();
+    app.get_by_label(open_menu).click();
+    app.step();
+    app.step();
+    assert_eq!(app.state().state.dialog, Some(filmstrip));
+}
+
+#[test]
+fn a_folder_can_be_removed_from_its_menu() {
+    let mut app = library_app(2);
+    settle(&mut app, |app| !app.state.lists.folders.is_empty());
+    let folder = app.state().state.lists.folders[0].id;
+    app.state_mut().state.apply(Action::ShowGrid);
+    app.step();
+    app.step();
+    app.get_by_label("photos   2").click_secondary();
+    app.step();
+    app.step();
+    app.step();
+    app.get_by_label("Remove from Catalog…").click();
+    app.step();
+    app.step();
+    assert_eq!(app.state().state.dialog, Some(Dialog::RemoveFolder { folder, name: "photos".into() }));
+    confirm_removal(&mut app, 0);
+    assert!(app.fixture.photos.join("photo-000.dng").is_file());
+}
+
+#[test]
+fn a_removed_folder_clears_a_filter_on_it() {
+    let mut app = library_app(2);
+    settle(&mut app, |app| !app.state.lists.folders.is_empty());
+    let folder = app.state().state.lists.folders[0].clone();
+    let chosen = unlight_catalog::FolderFilter { folder: folder.id, include_subfolders: true };
+    let rating = Some(RatingFilter { comparison: Comparison::GreaterOrEqual, value: 0 });
+    app.state_mut().state.library.set_filter(Filter { folder: Some(chosen), rating, ..Filter::default() });
+    app.state_mut().state.dialog = Some(Dialog::RemoveFolder { folder: folder.id, name: "photos".into() });
+    app.step();
+    app.step();
+    confirm_removal(&mut app, 0);
+    settle(&mut app, |app| app.state.lists.folders.is_empty());
+    let filter = app.state().state.library.filter().clone();
+    assert_eq!(filter.folder, None);
+    assert!(filter.rating.is_some(), "only the folder should go");
+    let store = store_of(&app);
+    store.flush();
+    assert_eq!(store.catalog.count(&Filter::default()).unwrap(), 0);
+    assert!(app.fixture.photos.join("photo-000.dng").is_file());
+}
+
 #[test]
 fn keywords_land_on_the_selection_and_can_be_filtered_by() {
     let mut app = library_app(2);

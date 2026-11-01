@@ -1,6 +1,7 @@
 //! The strip of thumbnails along the bottom.
 
 use crate::{
+    action::{Action, tip},
     darkroom::Darkroom,
     state::{
         AppState,
@@ -94,6 +95,8 @@ pub fn paint_thumbnail(ui: &Ui, area: Rect, row: &LibraryRow, darkroom: &Darkroo
 struct CellResult {
     clicked: bool,
     double_clicked: bool,
+    right_clicked: bool,
+    wants_remove: bool,
 }
 
 fn cell(
@@ -122,9 +125,18 @@ fn cell(
         ui.painter()
             .rect_stroke(rect, 3.0, (1.5, theme::HANDLE), StrokeKind::Inside);
     }
+    let mut wants_remove = false;
+    response.context_menu(|ui| {
+        if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
+            wants_remove = true;
+            ui.close();
+        }
+    });
     let result = CellResult {
         clicked: response.clicked(),
         double_clicked: response.double_clicked(),
+        right_clicked: response.secondary_clicked() && !selected,
+        wants_remove,
     };
     response.on_hover_text(title(row));
     result
@@ -182,6 +194,7 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
     let modifiers = ui.input(|input| input.modifiers);
     let mut clicked = None;
     let mut opened = None;
+    let mut wants_remove = false;
     ScrollArea::horizontal()
         .auto_shrink([false, false])
         .scroll_bar_visibility(ScrollBarVisibility::AlwaysHidden)
@@ -203,12 +216,14 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
                 darkroom.show_row(row);
                 let selected = state.library.is_selected(row.variant);
                 let result = cell(ui, rect, row, darkroom, focus == Some(index), selected);
-                if result.clicked {
+                // The menu acts on the selection, so a photo that's right-clicked has to be in it.
+                if result.clicked || result.right_clicked {
                     clicked = Some(index);
                 }
                 if result.double_clicked {
                     opened = Some(index);
                 }
+                wants_remove |= result.wants_remove;
             }
             if focus != last_scrolled {
                 if let Some(index) = focus {
@@ -226,6 +241,9 @@ fn strip(ui: &mut Ui, state: &mut AppState, darkroom: &mut Darkroom) {
     }
     if let Some(index) = opened {
         state.library.select(index);
-        state.apply(crate::action::Action::ShowDevelop);
+        state.apply(Action::ShowDevelop);
+    }
+    if wants_remove {
+        state.ask_to_remove_selection();
     }
 }

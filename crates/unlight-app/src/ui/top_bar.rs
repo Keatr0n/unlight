@@ -80,6 +80,12 @@ fn photo_menu(ui: &mut Ui, state: &mut AppState) {
         ui.add_enabled_ui(enabled, |ui| {
             ui.menu_button("Photo Merge", |ui| merge_items(ui, state));
         });
+        ui.add_enabled_ui(state.library.selection_len() > 0, |ui| {
+            if ui.button(tip("Remove from Catalog…", Action::DeleteSelected)).clicked() {
+                state.ask_to_remove_selection();
+                ui.close();
+            }
+        });
     });
     response.response.on_hover_text("Select two or more photos to merge them");
 }

@@ -36,7 +36,7 @@ use std::{
 };
 use transfer::{ExportForm, ExportRun, ImportPhase, ImportState};
 use unlight_catalog::{
-    Collection, CollectionId, Filter, Flag, Folder, FolderFilter, Keyword, Label, LibraryRow, Photo, PhotoId,
+    Collection, CollectionId, Filter, Flag, Folder, FolderFilter, FolderId, Keyword, Label, LibraryRow, Photo, PhotoId,
     PhotoStatus, Preset, PresetId, VariantId,
 };
 use unlight_recipe::{Crop, GuideLine, Recipe, Upright};
@@ -157,6 +157,8 @@ pub enum Dialog {
     Import,
     Export,
     PhotoMerge,
+    RemovePhotos { variants: Vec<VariantId> },
+    RemoveFolder { folder: FolderId, name: String },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -612,6 +614,42 @@ impl AppState {
             Action::ToolLarger => self.resize_tool(1),
             Action::DeleteSelected => self.delete_selected(),
         }
+    }
+
+    pub fn ask_to_remove_selection(&mut self) {
+        let variants = self.library.selection();
+        if !variants.is_empty() {
+            self.dialog = Some(Dialog::RemovePhotos { variants });
+        }
+    }
+
+    /// Unsaved edits go first, so nothing tries to save to a photo that has already left.
+    pub fn remove_variants(&mut self, variants: Vec<VariantId>) {
+        self.dialog = None;
+        self.flush_edits();
+        self.writes.push(Write::RemoveVariants(variants));
+    }
+
+    pub fn remove_folder(&mut self, folder: FolderId) {
+        self.dialog = None;
+        self.flush_edits();
+        self.writes.push(Write::RemoveFolder(folder));
+    }
+
+    pub fn variants_removed(&mut self, variants: &[VariantId]) {
+        self.edits.retain(|id, _| !variants.contains(id));
+        self.library.forget(variants);
+    }
+
+    /// There's no telling which photos went without asking, but edits reload from the catalog.
+    pub fn folder_removed(&mut self) {
+        self.edits.clear();
+        let filter = self.library.filter();
+        let filtered = filter.folder.map(|filter| filter.folder);
+        if filtered.is_some_and(|id| !self.lists.folders.iter().any(|folder| folder.id == id)) {
+            self.library.set_filter(Filter { folder: None, ..filter.clone() });
+        }
+        self.library.forget(&[]);
     }
 
     fn show_library(&mut self, view: LibraryView) {

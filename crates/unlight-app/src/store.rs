@@ -5,6 +5,7 @@
 use crate::state::{CatalogLists, library::PageRequest, write::Write};
 use anyhow::{Context, Result};
 use std::{
+    collections::HashSet,
     path::{Path, PathBuf},
     sync::{
         Arc, Mutex, PoisonError,
@@ -68,6 +69,9 @@ pub enum StoreEvent {
         snapshots: Vec<Snapshot>,
     },
     VariantCreated(VariantId),
+    /// These variants are gone from the catalog, and every copy of a removed photo with them.
+    VariantsRemoved(Vec<VariantId>),
+    FolderRemoved,
     /// Flags, ratings or labels changed, which may move rows in or out of a filtered view.
     MetadataChanged,
     /// Keywords changed on these variants.
@@ -200,6 +204,31 @@ fn read_once(
     Ok(())
 }
 
+/// Removes what was asked for and returns everything that went with it.
+fn remove_variants(catalog: &Catalog, variants: &[VariantId]) -> unlight_catalog::Result<Vec<VariantId>> {
+    let mut photos = HashSet::new();
+    let mut copies = Vec::new();
+    for id in variants {
+        let variant = catalog.variant(*id)?;
+        if variant.copy_name.is_some() {
+            copies.push(variant);
+        } else {
+            photos.insert(variant.photo);
+        }
+    }
+    let photos: Vec<_> = photos.into_iter().collect();
+    let mut removed = Vec::new();
+    for photo in &photos {
+        removed.extend(catalog.variants_of(*photo)?.iter().map(|variant| variant.id));
+    }
+    for copy in copies.iter().filter(|copy| !photos.contains(&copy.photo)) {
+        catalog.delete_variant(copy.id)?;
+        removed.push(copy.id);
+    }
+    catalog.remove_photos(&photos)?;
+    Ok(removed)
+}
+
 fn add_keywords(catalog: &Catalog, variants: &[VariantId], names: &[String]) -> unlight_catalog::Result<()> {
     for name in names {
         let keyword = catalog.create_keyword(None, name)?;
@@ -274,6 +303,14 @@ fn apply(catalog: &Catalog, write: Write) -> unlight_catalog::Result<Vec<StoreEv
         }
         Write::VirtualCopy(source) => {
             vec![StoreEvent::VariantCreated(catalog.create_virtual_copy(source)?)]
+        }
+        Write::RemoveVariants(variants) => {
+            let removed = remove_variants(catalog, &variants)?;
+            vec![lists()?, StoreEvent::VariantsRemoved(removed)]
+        }
+        Write::RemoveFolder(folder) => {
+            catalog.remove_folder(folder)?;
+            vec![lists()?, StoreEvent::FolderRemoved]
         }
         Write::PasteSettings { variants, settings } => {
             paste_onto(catalog, &variants, &settings)?;

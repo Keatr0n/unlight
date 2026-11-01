@@ -702,6 +702,8 @@ impl App {
                     self.state.library.select_variant(variant);
                     self.state.notify("Virtual copy created");
                 }
+                StoreEvent::VariantsRemoved(variants) => self.state.variants_removed(&variants),
+                StoreEvent::FolderRemoved => self.state.folder_removed(),
                 StoreEvent::MetadataChanged => {
                     if self.state.library.depends_on_metadata() {
                         self.state.library.refresh();

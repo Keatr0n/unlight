@@ -89,6 +89,8 @@ pub struct Library {
     selected: HashSet<VariantId>,
     /// A path to select as soon as its row turns up.
     pending_path: Option<PathBuf>,
+    /// A position to focus once the rows there have been read again.
+    refocus: Option<usize>,
 }
 
 impl Library {
@@ -155,6 +157,29 @@ impl Library {
             self.focus = None;
         }
         self.need_around_focus();
+    }
+
+    /// Rows have left the catalog. The row that takes the first one's place gets the focus, so
+    /// working down a shoot keeps its position.
+    pub fn forget(&mut self, variants: &[VariantId]) {
+        let gone: HashSet<VariantId> = variants.iter().copied().collect();
+        let first = self
+            .pages
+            .iter()
+            .filter_map(|(page, rows)| {
+                let position = rows.iter().position(|row| gone.contains(&row.variant))?;
+                Some(*page as usize * PAGE_SIZE as usize + position)
+            })
+            .min();
+        let place = first.or(self.focus);
+        self.selected.clear();
+        self.focus_id = None;
+        self.anchor = None;
+        self.reload(true);
+        self.refocus = place;
+        if let Some(place) = place {
+            self.need(place);
+        }
     }
 
     /// Whether the row count should be fetched, once.
@@ -251,6 +276,22 @@ impl Library {
     /// Keeps the focus on the same variant as rows move around it, and picks the first row
     /// when there's no focus at all yet.
     fn settle_focus(&mut self) {
+        if let Some(place) = self.refocus {
+            let Some(count) = self.count else {
+                return;
+            };
+            self.refocus = None;
+            if count > 0 {
+                let place = place.min(count as usize - 1);
+                if self.row(place).is_some() {
+                    self.focus_on(place);
+                } else {
+                    self.refocus = Some(place);
+                    self.need(place);
+                }
+            }
+            return;
+        }
         if let Some(path) = &self.pending_path
             && let Some(index) = self.index_where(|row| row.path == *path)
         {

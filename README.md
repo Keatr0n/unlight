@@ -65,6 +65,8 @@ They're mostly the Lightroom ones, so your fingers should already know them.
 
 `p` / `x` / `u`: **p**ick, reject, **u**nflag
 
+`delete`: remove from the catalog (the file stays on disk, and it asks first)
+
 `0` to `5`: rating
 
 `6` to `9`: colour label

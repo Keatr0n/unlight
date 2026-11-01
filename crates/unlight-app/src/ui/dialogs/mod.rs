@@ -4,6 +4,7 @@ mod export;
 mod import;
 mod merge;
 mod presets;
+mod remove;
 mod settings;
 mod smart_collection;
 
@@ -105,6 +106,8 @@ pub fn show(ui: &mut Ui, state: &mut AppState) {
             Dialog::Import => import::show(ui, state),
             Dialog::Export => export::show(ui, state),
             Dialog::PhotoMerge => merge::show(ui, state),
+            Dialog::RemovePhotos { variants } => remove::photos(ui, state, variants),
+            Dialog::RemoveFolder { folder, name } => remove::folder(ui, state, folder, &name),
         }
     });
     if response.should_close() && state.dialog.is_some() {
