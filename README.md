@@ -98,7 +98,7 @@ Anything LibRaw 0.22 can decode should load, but these are the ones that have be
 
 ## Camera profiles
 
-Adobe's profiles can't be shipped with this for obvious reasons, but if you've got any `.dcp` files just chuck them in `~/.local/share/unlight/profiles` and pick one from the Profile menu in Basic. You don't need to restart. Without one you get Unlight's own default look, which was fitted against camera JPEGs.
+Adobe's profiles can't be shipped with this for obvious reasons, but if you've got any `.dcp` files just chuck them in `~/.local/share/unlight/profiles`, hit Rescan Profiles in the Profile menu in Basic and pick one. No restart needed. Without one you get Unlight's own default look, which was fitted against camera JPEGs.
 
 ## AI
 
