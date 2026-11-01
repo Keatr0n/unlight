@@ -1,0 +1,11 @@
+[package]
+name = "unlight-lensfun-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "lensfun"
+
+[build-dependencies]
+bindgen.workspace = true
+pkg-config.workspace = true

@@ -1,0 +1,13 @@
+# Sample raws live outside the repo. Point UNLIGHT_SAMPLES at a directory holding these files.
+# Source: https://raw.pixls.us (CC0). Fetch with: scripts/fetch-samples.sh
+e6dafe42643f69ab9d1fd00414b7a1f5104df354bb589201600ac934b29b5e4a  sony-a7rm4.ARW
+89bd55532b0cceb5efa360e97827ba35c2076bce0de4675f3a4413a883dac880  canon-eosr.CR3
+94635c6f91e7d743cee6881cc2519992ae9f9031fd86b49e5d0f16edf5961b55  canon-m6ii-craw.CR3
+85bfec149261ffbae90797e45caae5e204e1e61ac62b92783925b5ee0f267d76  canon-5d4.CR2
+c079345fc93f53a4f0d322f8ddaae505f920c36015f25b58befccaa61db1af31  nikon-z6.NEF
+82df041542b8d328738443bb5ff3373b396e406ecc8cbe7dc3b35252790c53e7  nikon-z8-compressed.NEF
+07ea642656074834ffe5c661870a612ffa2e80fc1218a05166ee966bbe5f6fae  fuji-xt4.RAF
+0c03a6c93b4b8593cd0e4426166e6389710007238b82eb23861ef191322f0c54  pixel4xl.dng
+dae2281df393d8c3c1b8c513d00985f1834ae0e69ce18fbd571370c25d95d22b  gh5.RW2
+53ba694a8210b09b6e3d43cc0f5725f868afe5453674363350e8f76a45c6f7bf  hasselblad-h6d.fff
+386ce0122687b802e8e57151d36643b830f87e59eed15b65c690d1032eb3b763  sony-a7c-iso12800.ARW

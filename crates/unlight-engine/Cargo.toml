@@ -1,0 +1,26 @@
+[package]
+name = "unlight-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+unlight-color.workspace = true
+unlight-lens.workspace = true
+unlight-raw.workspace = true
+unlight-recipe.workspace = true
+bytemuck.workspace = true
+pollster.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+wgpu.workspace = true
+
+[dev-dependencies]
+unlight-output.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+zune-jpeg.workspace = true

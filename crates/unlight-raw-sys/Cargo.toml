@@ -1,0 +1,11 @@
+[package]
+name = "unlight-raw-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "raw_r"
+
+[build-dependencies]
+bindgen.workspace = true
+pkg-config.workspace = true

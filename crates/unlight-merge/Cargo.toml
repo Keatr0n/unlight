@@ -1,0 +1,25 @@
+[package]
+name = "unlight-merge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+unlight-color.workspace = true
+unlight-lens.workspace = true
+unlight-raw.workspace = true
+jpeg-encoder = { workspace = true, features = ["simd"] }
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+unlight-engine.workspace = true
+unlight-recipe.workspace = true
+png.workspace = true
+tempfile.workspace = true
+zune-core.workspace = true
+zune-jpeg.workspace = true

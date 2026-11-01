@@ -1,0 +1,47 @@
+[package]
+name = "unlight-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "unlight_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "unlight"
+path = "src/main.rs"
+
+[features]
+default = ["ai"]
+ai = ["dep:unlight-ai"]
+
+[dependencies]
+unlight-ai = { workspace = true, optional = true }
+unlight-catalog.workspace = true
+unlight-engine.workspace = true
+unlight-merge.workspace = true
+unlight-output.workspace = true
+unlight-raw.workspace = true
+unlight-recipe.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+eframe = { version = "0.37", default-features = false, features = ["wgpu", "wayland", "x11", "default_fonts"] }
+raw-window-handle = "0.6"
+rfd = "0.17"
+serde.workspace = true
+serde_json.workspace = true
+wayland-backend = { version = "0.3", features = ["client_system"] }
+wayland-client = "0.31"
+walkdir.workspace = true
+wgpu.workspace = true
+
+[dev-dependencies]
+egui_kittest = { version = "0.37", features = ["wgpu", "eframe", "snapshot"] }
+jpeg-encoder.workspace = true
+rusqlite.workspace = true
+tempfile.workspace = true

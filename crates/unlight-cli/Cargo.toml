@@ -1,0 +1,33 @@
+[package]
+name = "unlight-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "unlight-cli"
+path = "src/main.rs"
+
+[features]
+default = ["ai"]
+ai = ["dep:unlight-ai"]
+
+[dependencies]
+unlight-ai = { workspace = true, optional = true }
+unlight-color.workspace = true
+unlight-engine.workspace = true
+unlight-merge.workspace = true
+unlight-output.workspace = true
+unlight-raw.workspace = true
+unlight-recipe.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+png.workspace = true
+serde_json.workspace = true
+tiff.workspace = true
+zune-jpeg.workspace = true

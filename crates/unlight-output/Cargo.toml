@@ -1,0 +1,37 @@
+[package]
+name = "unlight-output"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ab_glyph.workspace = true
+bytemuck.workspace = true
+fast_image_resize = { workspace = true, features = ["rayon"] }
+flate2.workspace = true
+lcms2.workspace = true
+mozjpeg.workspace = true
+png.workspace = true
+rayon.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+unlight-color.workspace = true
+xxhash-rust.workspace = true
+
+[dev-dependencies]
+epaint_default_fonts.workspace = true
+jxl-oxide.workspace = true
+kamadak-exif.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tiff.workspace = true
+zune-core.workspace = true
+zune-jpeg.workspace = true
+
+[build-dependencies]
+bindgen.workspace = true
+pkg-config.workspace = true

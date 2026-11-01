@@ -1,0 +1,16 @@
+[package]
+name = "unlight-color"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+unlight-raw.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

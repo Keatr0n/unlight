@@ -1,0 +1,52 @@
+# Models Unlight can download on request. Weights are never in git or the Nix store, and each
+# file is checked against `sha256` before it is loaded. Add a model only after reading its
+# weights' licence: see MODELS.md for what was checked and why these were chosen.
+
+[[model]]
+name = "u2net"
+title = "U²-Net"
+task = "subject"
+url = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx"
+size = 175997641
+sha256 = "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491"
+licence = "Apache-2.0"
+licence_url = "https://github.com/xuebinqin/U-2-Net/blob/master/LICENSE"
+
+[model.network]
+kind = "segmentation"
+input_size = 320
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+output = "probability"
+
+[[model]]
+name = "skyseg"
+title = "Sky segmentation (U²-Net)"
+task = "sky"
+url = "https://huggingface.co/JianyuanWang/skyseg/resolve/3ba8c6df1d9ba9ff26f637c7ba9568ac11a9aa7f/skyseg.onnx"
+size = 175997079
+sha256 = "ab9c34c64c3d821220a2886a4a06da4642ffa14d5b30e8d5339056a089aa1d39"
+licence = "MIT"
+licence_url = "https://github.com/xiongzhu666/Sky-Segmentation-and-Post-processing/blob/main/LICENSE"
+
+[model.network]
+kind = "segmentation"
+input_size = 320
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+output = "probability"
+
+[[model]]
+name = "nafnet-sidd"
+title = "NAFNet (SIDD)"
+task = "denoise"
+url = "https://huggingface.co/deepghs/image_restoration/resolve/77885239ff28876d6b37dd080ab86aa1de2c49cc/NAFNet-SIDD-width64.onnx"
+size = 467748365
+sha256 = "9b8d0cf8a9563b04213e0253c6d7bf595beb49d77824bfed8facee7c59ba4d40"
+licence = "MIT"
+licence_url = "https://github.com/megvii-research/NAFNet/blob/main/LICENSE"
+
+[model.network]
+kind = "restoration"
+tile = 512
+overlap = 32
