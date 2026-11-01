@@ -1,20 +1,16 @@
 # unlight
 
-is a raw photo editor that's basically Lightroom Classic, except it runs on NixOS. I wanted Lightroom on my machine, that isn't a thing, so now this exists.
-
-Also many apologies, because Claude wrote basically all of this. I gave it the brief, picked the cameras and the licence, and it went off with a pile of agents. tbh I wanted a raw editor that works more than I wanted to learn how to port an X-Trans demosaic to WGSL.
-
-It's Rust, wgpu and egui, and every edit is stored as a recipe so your raws never get touched.
+a clone of lightroom classic entirely vibed with claude. Tbh this was more of an experiment than anything, but it seems to work, so I can't really complain.
 
 ## Running
 
-It's a flake, so just run
+if you got nix then just
 
 ```shell
 nix run .
 ```
 
-If you don't want any of the AI stuff (fair enough), this gives you the same app with no AI code and no ONNX Runtime in it at all
+It also can be run without all the local ai stuff with
 
 ```shell
 nix build .#without-ai
@@ -102,19 +98,19 @@ Anything LibRaw 0.22 can decode should load, but these are the ones that have be
 
 ## Camera profiles
 
-Adobe's profiles can't be shipped with this for obvious reasons, but if you've got any `.dcp` files just chuck them in `~/.local/share/unlight/profiles`, hit Rescan Profiles in the Profile menu in Basic and pick one. No restart needed. Without one you get Unlight's own default look, which was fitted against camera JPEGs.
+Adobe's profiles can't be shipped with this for obvious reasons, but if you've got any `.dcp` files just throw them in `~/.local/share/unlight/profiles`, hit Rescan Profiles in the Profile menu in Basic and pick one. No restart needed. Without one you get Unlight's own default look, which was fitted against camera JPEGs.
 
 ## AI
 
-All optional, all local, nothing leaves your machine. You get Select Subject, Select Sky and AI Denoise running on ONNX Runtime, and the models only get downloaded when you ask for them.
+Claude thought it'd be neat to have some ai stuff in here as well, so included in the default build is Select Subject, Select Sky and AI Denoise running on ONNX Runtime, and the models only get downloaded when you ask for them.
 
 It's CPU only because a long GPU job can trip amdgpu's 2 second timeout and take your desktop with it, and I'd rather not. That does mean AI Denoise takes about 5 and a half minutes on a 24 MP photo, so it's export and CLI only.
 
 The licensing rabbit hole for each model is in [MODELS.md](crates/unlight-ai/MODELS.md). The short version is BiRefNet got left out because its training data bans commercial use.
 
-## Is it fast tho
+## Is it fast too
 
-Yeah, pretty much. This is on a Ryzen AI 9 HX 370 with the Radeon 890M, so just the iGPU, on a quiet machine. The slider numbers are after 5 minutes of heat soak.
+This is on my framework with a Ryzen AI 9 HX 370 and Radeon 890M igpu. The slider numbers are after 5 minutes of heat soak.
 
 | Thing | Time |
 |---|---|
@@ -127,9 +123,9 @@ Yeah, pretty much. This is on a Ryzen AI 9 HX 370 with the Radeon 890M, so just 
 | Holding the arrow key, until it's editable (p95) | 470 ms |
 | Batch exporting 1000 photos | 24 min, no GPU resets |
 
-Those are GPU times, I haven't measured slider to actual screen on a real display yet.
+Those are GPU times, I haven't measured slider to actual screen on a real display yet. But it feels quick enough.
 
-## What's still not great
+## What's still not great (claudes opinion)
 
 - The default look isn't quite there. It's meant to land near the camera's own JPEG and it's still further off than I'd like, and the Canon M6 II comes out too bright.
 - Panoramas cap out at 16384 px because a photo has to fit in one texture, so ten 61 MP frames come out at 25% scale.
