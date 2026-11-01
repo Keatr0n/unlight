@@ -617,12 +617,15 @@ impl AppState {
         }
     }
 
-    /// The open photo turns here so it answers at once. The rest of the selection is the
-    /// catalog's job.
+    /// The open photo turns here so it answers at once. In the Library, the rest of the
+    /// selection goes with it, which is the catalog's job. Develop only ever edits one photo.
     fn turn_selection(&mut self, turn: Orientation) {
         let focused = self.focused().map(|row| row.variant).filter(|id| self.edits.contains_key(id));
-        let others: Vec<VariantId> =
-            self.library.selection().into_iter().filter(|id| Some(*id) != focused).collect();
+        let others: Vec<VariantId> = if self.module == Module::Develop && focused.is_some() {
+            Vec::new()
+        } else {
+            self.library.selection().into_iter().filter(|id| Some(*id) != focused).collect()
+        };
         if focused.is_some()
             && let Some(edit) = self.edit_mut()
         {

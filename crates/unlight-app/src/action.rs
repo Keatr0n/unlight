@@ -153,7 +153,8 @@ pub const BINDINGS: &[(Modifiers, Key, Action)] = &[
 pub fn shortcut_text(action: Action) -> Option<String> {
     let (modifiers, key, _) = BINDINGS.iter().find(|(_, _, bound)| *bound == action)?;
     let shortcut = KeyboardShortcut::new(*modifiers, *key);
-    Some(shortcut.format(&ModifierNames::NAMES, false))
+    let text = shortcut.format(&ModifierNames::NAMES, false);
+    Some(text.replace("OpenBracket", "[").replace("CloseBracket", "]"))
 }
 
 /// Tooltip text that teaches the shortcut.
@@ -182,6 +183,9 @@ mod tests {
     fn tooltips_show_the_real_binding() {
         assert_eq!(tip("Undo", Action::Undo), "Undo  (Ctrl+Z)");
         assert_eq!(tip("Redo", Action::Redo), "Redo  (Ctrl+Shift+Z)");
+        let right = Action::Turn(Orientation::RotateCw);
+        assert_eq!(tip("Rotate Right", right), "Rotate Right  (Ctrl+])");
+        assert_eq!(tip("Smaller", Action::ToolSmaller), "Smaller  ([)");
         assert_eq!(tip("Crop", Action::ToggleTool(Tool::Crop)), "Crop  (R)");
     }
 }

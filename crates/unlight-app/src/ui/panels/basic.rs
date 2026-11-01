@@ -118,7 +118,7 @@ fn white_balance_row(ui: &mut Ui, edit: &mut PhotoEdit, context: &mut PanelConte
 }
 
 /// A row with a label on the left and the rest of the width for `add`, as Lightroom's Profile.
-fn labelled_row<R>(ui: &mut Ui, label: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
+pub(crate) fn labelled_row<R>(ui: &mut Ui, label: &str, add: impl FnOnce(&mut Ui) -> R) -> R {
     let (rect, _) = ui.allocate_exact_size(
         vec2(ui.available_width(), theme::ROW_HEIGHT + 4.0),
         Sense::hover(),

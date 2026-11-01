@@ -1,7 +1,7 @@
 //! Painted icons. Drawing them keeps them crisp at any fractional scale, and keeps one
 //! typeface in the interface.
 
-use eframe::egui::{Color32, Painter, Pos2, Rect, Stroke, StrokeKind, pos2, vec2};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Stroke, StrokeKind, pos2, vec2};
 use std::f32::consts::{FRAC_PI_2, TAU};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,6 +16,10 @@ pub enum Icon {
     Lock,
     Unlock,
     Flip,
+    RotateLeft,
+    RotateRight,
+    FlipHorizontal,
+    FlipVertical,
     Plus,
     Close,
     Split,
@@ -116,6 +120,29 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
                 StrokeKind::Middle,
             );
             painter.line(circle_points(at(-1.5, 1.5), 8.0, -1.35, -0.2, 8), stroke);
+        }
+        Icon::RotateLeft | Icon::RotateRight => {
+            let side = if icon == Icon::RotateRight { 1.0 } else { -1.0 };
+            let frame = Rect::from_center_size(at(0.0, 3.5), vec2(8.0, 6.0));
+            painter.rect_stroke(frame, 1.0, stroke, StrokeKind::Middle);
+            let arc: Vec<Pos2> = circle_points(pos2(0.0, 1.5), 6.5, -2.75, -0.45, 14)
+                .into_iter()
+                .map(|point| at(point.x * side, point.y))
+                .collect();
+            let tip = arc[arc.len() - 1];
+            painter.line(arc, stroke);
+            painter.line_segment([tip, tip + vec2(-3.0 * side, -0.25)], stroke);
+            painter.line_segment([tip, tip + vec2(0.5 * side, -3.0)], stroke);
+        }
+        Icon::FlipHorizontal | Icon::FlipVertical => {
+            let across = |x: f32, y: f32| {
+                if icon == Icon::FlipHorizontal { at(x, y) } else { at(y, x) }
+            };
+            painter.line_segment([across(0.0, -7.0), across(0.0, 7.0)], stroke);
+            let solid = vec![across(-2.0, -4.5), across(-2.0, 4.5), across(-7.0, 4.5)];
+            painter.add(Shape::convex_polygon(solid, color.gamma_multiply(0.45), stroke));
+            let outline = vec![across(2.0, -4.5), across(2.0, 4.5), across(7.0, 4.5), across(2.0, -4.5)];
+            painter.line(outline, stroke);
         }
         Icon::Plus => {
             painter.line_segment([at(0.0, -4.5), at(0.0, 4.5)], stroke);

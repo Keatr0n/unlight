@@ -1,7 +1,7 @@
 //! The right side of Develop: histogram, tool strip, then the panels in Lightroom's order.
 
 use crate::{
-    action::{Action, tip},
+    action::{Action, TURNS, tip},
     darkroom::LivePhoto,
     renderer::Histogram,
     state::{
@@ -12,7 +12,7 @@ use crate::{
     },
     ui::{
         local_panels,
-        panels::{PanelContext, PanelRequest, show_section},
+        panels::{PanelContext, PanelRequest, labelled_row, show_section},
         proof_panel,
         theme,
         widgets::{
@@ -90,6 +90,9 @@ fn tool_strip(ui: &mut Ui, state: &mut AppState) {
         }
     });
 }
+
+/// In the order of `TURNS`.
+const TURN_ICONS: [Icon; 4] = [Icon::RotateLeft, Icon::RotateRight, Icon::FlipHorizontal, Icon::FlipVertical];
 
 fn crop_panel(ui: &mut Ui, state: &mut AppState, live: Option<&LivePhoto>) {
     let (orientation, aspect) = match live {
@@ -173,6 +176,20 @@ fn crop_panel(ui: &mut Ui, state: &mut AppState, live: Option<&LivePhoto>) {
 
     check_row(ui, &mut state.crop_tool.show_grid, "Show Grid");
     ui.add_space(theme::GRID);
+    let turn = labelled_row(ui, "Rotate", |row| {
+        let mut chosen = None;
+        for (icon, (label, turn)) in TURN_ICONS.into_iter().zip(TURNS) {
+            if icon_button(row, icon, &tip(label, Action::Turn(turn)), false).clicked() {
+                chosen = Some(turn);
+            }
+        }
+        chosen
+    });
+    if let Some(turn) = turn {
+        state.apply(Action::Turn(turn));
+    }
+    ui.add_space(theme::GRID);
+
     let gap = theme::GRID;
     let width = (ui.available_width() - gap * 2.0) / 3.0;
     ui.horizontal(|ui| {

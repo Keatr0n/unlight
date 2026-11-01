@@ -562,6 +562,7 @@ fn a_rotation_and_a_flip_stack_as_seen_on_screen() {
 #[test]
 fn the_whole_selection_turns_together() {
     let mut app = library_app(3);
+    app.state_mut().state.apply(Action::ShowGrid);
     app.state_mut().state.library.select(0);
     app.state_mut().state.library.click(2, ClickKind::Extend);
     app.step();
@@ -577,6 +578,51 @@ fn the_whole_selection_turns_together() {
     for variant in variants {
         assert_eq!(turned_in_the_catalog(&app, variant), Orientation::MirrorY);
     }
+}
+
+#[test]
+fn develop_only_turns_the_open_photo() {
+    let mut app = library_app(3);
+    app.state_mut().state.apply(Action::ShowDevelop);
+    app.state_mut().state.library.select(0);
+    app.state_mut().state.library.click(2, ClickKind::Extend);
+    app.step();
+    let open = app.state().state.focused().unwrap().variant;
+    let others: Vec<_> = app.state().state.library.selection().into_iter().filter(|id| *id != open).collect();
+    assert_eq!(others.len(), 2);
+    app.state_mut().state.apply(Action::Turn(Orientation::RotateCw));
+    let_settle(&mut app);
+    assert_eq!(turned_in_the_catalog(&app, open), Orientation::RotateCw);
+    for variant in others {
+        assert_eq!(turned_in_the_catalog(&app, variant), Orientation::Normal);
+    }
+}
+
+#[test]
+fn the_crop_panel_rotates_and_flips() {
+    let mut app = library_app(1);
+    app.state_mut().state.apply(Action::ShowDevelop);
+    settle(&mut app, support::live);
+    app.state_mut().state.apply(Action::ToggleTool(Tool::Crop));
+    app.step();
+    app.step();
+    app.get_by_label("Rotate Right  (Ctrl+])").click();
+    app.step();
+    app.step();
+    assert_eq!(recipe(&app).orientation, Orientation::RotateCw);
+    app.get_by_label("Rotate Left  (Ctrl+[)").click();
+    app.step();
+    app.step();
+    assert_eq!(recipe(&app).orientation, Orientation::Normal);
+    app.get_by_label("Flip Horizontal").click();
+    app.step();
+    app.step();
+    assert_eq!(recipe(&app).orientation, Orientation::MirrorX);
+    app.get_by_label("Flip Vertical").click();
+    app.step();
+    app.step();
+    assert_eq!(recipe(&app).orientation, Orientation::Rotate180);
+    assert_eq!(app.state().state.tool, Tool::Crop, "the tool stays open");
 }
 
 #[test]

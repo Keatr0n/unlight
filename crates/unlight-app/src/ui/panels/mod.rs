@@ -10,6 +10,8 @@ mod lens;
 mod tone_curve;
 mod transform;
 
+pub(crate) use basic::labelled_row;
+
 use crate::{
     state::{edit::PhotoEdit, sections::Section},
     ui::widgets::slider::{Slider, Spec},
